@@ -26,10 +26,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "darmixpet_db"
                 )
                     .addMigrations(*ALL_MIGRATIONS)
-                    // Red de seguridad SOLO para saltos de versión no cubiertos
-                    // por una migración explícita (por ejemplo, instalaciones muy
-                    // antiguas). Cualquier cambio de esquema nuevo debe agregar
-                    // su propia Migration en Migrations.kt, no depender de esto.
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
             }
