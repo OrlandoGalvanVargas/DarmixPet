@@ -15,14 +15,6 @@ data class InstalledAppInfo(
 
 object InstalledAppsProvider {
 
-    /**
-     * Devuelve las apps instaladas que tienen un ícono de lanzador
-     * (excluye componentes de sistema sin UI, servicios, etc.)
-     * y excluye la propia app DarmixPet.
-     *
-     * Debe llamarse desde un hilo de fondo (Dispatchers.IO): decodifica
-     * íconos de potencialmente cientos de apps.
-     */
     fun getLaunchableApps(context: Context): List<InstalledAppInfo> {
         val packageManager = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).apply {
