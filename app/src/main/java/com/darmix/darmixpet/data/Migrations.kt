@@ -3,16 +3,6 @@ package com.darmix.darmixpet.data
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-/**
- * Historial de migraciones reales de Room. A partir de aquí, cualquier cambio
- * de esquema debe agregarse como una migración nueva (MIGRATION_X_Y) en vez
- * de depender de fallbackToDestructiveMigration, para no perder los datos
- * de configuración del usuario (apps monitoreadas, progreso del día, etc.).
- */
-
-// v5 -> v6: se elimina la columna contextualWarningGiven (el aviso contextual
-// de noche/batería baja dejó de ser por-app y pasó a ser un estado global de
-// la mascota, manejado directamente en PetOverlayService sin tocar Room).
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(
