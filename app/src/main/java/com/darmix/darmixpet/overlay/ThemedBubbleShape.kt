@@ -6,7 +6,7 @@ import com.darmix.darmixpet.mascota.BubbleShapeStyle
 
 enum class BubblePointerSide { NONE, LEFT, RIGHT, TOP, BOTTOM }
 
-/** Construye el contorno (fondo + pico opcional) según el estilo del personaje activo. */
+
 object ThemedBubbleShape {
 
     fun buildPath(
