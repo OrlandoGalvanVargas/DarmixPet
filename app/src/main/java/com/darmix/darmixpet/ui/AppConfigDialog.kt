@@ -272,7 +272,7 @@ fun AppConfigDialog(
     }
 }
 
-/** Un ajuste: encabezado, [ − valor + ] y atajos rápidos. El valor también se puede escribir. */
+
 @Composable
 private fun ConfigSection(
     icon: ImageVector,

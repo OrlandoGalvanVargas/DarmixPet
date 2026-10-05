@@ -1,6 +1,6 @@
 package com.darmix.darmixpet
 
-import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,8 +30,14 @@ import com.darmix.darmixpet.ui.theme.ThemeMode
 import com.darmix.darmixpet.ui.theme.ThemePreferences
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.activity.SystemBarStyle
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.darmix.darmixpet.ui.GuideDialog
+import com.darmix.darmixpet.ui.GuidePreferences
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -39,9 +45,27 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
 
+            val darkNow = when (themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            DisposableEffect(darkNow) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT
+                    ) { darkNow },
+                    navigationBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT
+                    ) { darkNow }
+                )
+                onDispose {}
+            }
+
             DarmixPetTheme(themeMode = themeMode) {
                 val lifecycleOwner = LocalLifecycleOwner.current
 
+                @RequiresApi(Build.VERSION_CODES.Q)
                 fun checkAllGranted() =
                     OverlayPermissionHelper.hasOverlayPermission(context) &&
                             UsageStatsPermissionHelper.hasUsageStatsPermission(context) &&
@@ -91,6 +115,12 @@ class MainActivity : ComponentActivity() {
                         PermissionsScreen(onAllGranted = { allGranted = true })
                     }
                 }
+
+                var showGuide by remember { mutableStateOf(false) }
+                LaunchedEffect(allGranted) {
+                    if (allGranted && !GuidePreferences.hasSeen(context)) showGuide = true
+                }
+                if (showGuide && allGranted) GuideDialog(onDismiss = { showGuide = false })
             }
         }
     }
