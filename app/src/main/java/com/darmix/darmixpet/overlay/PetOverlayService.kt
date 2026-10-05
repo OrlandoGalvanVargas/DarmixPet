@@ -27,7 +27,6 @@ import com.darmix.darmixpet.R
 import com.darmix.darmixpet.mascota.ConfigurableSkin
 import com.darmix.darmixpet.mascota.MascotaAnimState
 import com.darmix.darmixpet.mascota.MascotaSkin
-import com.darmix.darmixpet.mascota.MotivationalPhrases
 import com.darmix.darmixpet.mascota.SkinInfo
 import com.darmix.darmixpet.mascota.SkinPreferences
 import com.darmix.darmixpet.mascota.SkinRegistry
@@ -47,8 +46,10 @@ import java.util.Calendar
 import com.darmix.darmixpet.tts.TtsManager
 import android.view.GestureDetector
 import com.darmix.darmixpet.monitor.ContextualStateChecker
+import com.darmix.darmixpet.MainActivity
+import com.darmix.darmixpet.mascota.CharacterPhrases
 
-/** Resultado de calcular dónde debe ir un elemento anclado a la mascota. */
+
 private data class Anchored(val x: Int, val y: Int, val side: BubblePointerSide)
 
 class PetOverlayService : LifecycleService() {
@@ -60,7 +61,7 @@ class PetOverlayService : LifecycleService() {
         private const val FOREGROUND_POLL_INTERVAL_MS = 1000L
         private const val CONTEXTUAL_CHECK_INTERVAL_MS = 5_000L
         private const val DAILY_RESET_CHECK_INTERVAL_MS = 60_000L
-        private const val BLOCK_OVERLAY_DISMISS_DELAY_MS = 900L
+        private const val BLOCK_OVERLAY_DISMISS_DELAY_MS = 1300L
         private const val BLOCK_DEBOUNCE_MS = 2000L
         private const val BUBBLE_FADE_MS = 250L
         private const val BUBBLE_VISIBLE_MS = 1500L
@@ -71,10 +72,12 @@ class PetOverlayService : LifecycleService() {
         private const val TRIPLE_TAP_WINDOW_MS = 600L
         private const val TAP_SUPPRESSION_WINDOW_MS = 500L
         private const val BATTERY_ALERT_REAPPEAR_INTERVAL_MS = 5 * 60_000L
+        private const val TORCH_TOGGLE_COOLDOWN_MS = 1200L
 
         @Volatile private var userRequestedStop = false
 
         fun start(context: Context) {
+            if (!PetPreferences.isEnabled(context)) return
             userRequestedStop = false
             val intent = Intent(context, PetOverlayService::class.java)
             ContextCompat.startForegroundService(context, intent)
@@ -92,6 +95,9 @@ class PetOverlayService : LifecycleService() {
     private lateinit var ttsManager: TtsManager
     private lateinit var foregroundTracker: ForegroundAppTracker
     private var petSizePx = 0
+
+    private lateinit var flashlight: FlashlightController
+    private var lastTorchToggleAt = 0L
 
     @Volatile private var isScreenOn = true
     private var screenReceiverRegistered = false
@@ -157,6 +163,7 @@ class PetOverlayService : LifecycleService() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         currentBaseState = computeDesiredBaseState()
+        flashlight = FlashlightController(this)
         addOverlayView()
 
         ttsManager = TtsManager(this)
@@ -202,6 +209,7 @@ class PetOverlayService : LifecycleService() {
             screenReceiverRegistered = false
         }
         SkinPreferences.unregisterListener(this, skinPrefsListener)
+        if (::flashlight.isInitialized) flashlight.release()
         bubbleJob?.cancel()
         quickMenuStatusJob?.cancel()
         batteryAlertReappearJob?.cancel()
@@ -226,7 +234,7 @@ class PetOverlayService : LifecycleService() {
         quickMenuView?.setTheme(spec)
     }
 
-    // ==================== DETECCIÓN INSTANTÁNEA (AccessibilityService) ====================
+
 
     private fun startInstantGateListener() {
         lifecycleScope.launch {
@@ -258,7 +266,7 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    // ==================== MONITOREO DE APPS (acumulación de tiempo) ====================
+
 
     private fun startMonitoringLoop() {
         lifecycleScope.launch {
@@ -346,7 +354,7 @@ class PetOverlayService : LifecycleService() {
         startActivity(homeIntent)
     }
 
-    // ==================== REINICIO DIARIO PROACTIVO ====================
+
 
     private fun startDailyResetWatcherLoop() {
         lifecycleScope.launch {
@@ -370,7 +378,7 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    // ==================== OVERLAY DE BLOQUEO DE PANTALLA ====================
+
 
     private fun blockAndRedirectHome(message: String) {
         val now = System.currentTimeMillis()
@@ -388,7 +396,11 @@ class PetOverlayService : LifecycleService() {
     }
 
     private fun showBlockOverlay(message: String) {
-        val view = BlockOverlayView(this).apply { setMessage(message) }
+        if (blockOverlayView != null) return
+        val view = BlockOverlayView(this).apply {
+            setTheme(currentSkinInfo.theme)
+            setMessage(message)
+        }
         blockOverlayParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -397,15 +409,19 @@ class PetOverlayService : LifecycleService() {
             PixelFormat.TRANSLUCENT
         )
         windowManager.addView(view, blockOverlayParams)
+        view.playIn()
         blockOverlayView = view
     }
 
     private fun hideBlockOverlay() {
-        blockOverlayView?.let { windowManager.removeView(it) }
+        val view = blockOverlayView ?: return
         blockOverlayView = null
+        view.playOut {
+            runCatching { windowManager.removeView(view) }
+        }
     }
 
-    // ==================== BOCADILLO DE TEXTO (tap simple) ====================
+
 
     private fun ensureSpeechBubble(): SpeechBubbleView {
         speechBubbleView?.let { return it }
@@ -467,13 +483,11 @@ class PetOverlayService : LifecycleService() {
         speechBubbleParams.y = anchored.y
         windowManager.updateViewLayout(bubble, speechBubbleParams)
 
-        bubble.animate().cancel()
-        bubble.alpha = 0f
-        bubble.animate().alpha(1f).setDuration(BUBBLE_FADE_MS).start()
+        bubble.popIn(BUBBLE_FADE_MS)
 
         bubbleJob = lifecycleScope.launch {
             delay(BUBBLE_FADE_MS + BUBBLE_VISIBLE_MS)
-            bubble.animate().alpha(0f).setDuration(BUBBLE_FADE_MS).start()
+            bubble.popOut(BUBBLE_FADE_MS)
         }
     }
 
@@ -487,7 +501,7 @@ class PetOverlayService : LifecycleService() {
         windowManager.updateViewLayout(bubble, speechBubbleParams)
     }
 
-    // ==================== ALERTA PERSISTENTE DE BATERÍA BAJA ====================
+
 
     private fun ensureBatteryAlertView(): BatteryAlertView {
         batteryAlertView?.let { return it }
@@ -512,8 +526,10 @@ class PetOverlayService : LifecycleService() {
 
         val (w, h) = view.measureSelf()
         val anchored = computeAnchoredPosition(w, h)
-        batteryAlertParams.x = anchored.x
-        batteryAlertParams.y = anchored.y
+        view.setPointerSide(anchored.side)
+        val (nx, ny) = view.nudgedPosition(anchored.x, anchored.y, anchored.side)
+        batteryAlertParams.x = nx
+        batteryAlertParams.y = ny
         windowManager.updateViewLayout(view, batteryAlertParams)
 
         view.startBlink()
@@ -530,8 +546,12 @@ class PetOverlayService : LifecycleService() {
         if (view.visibility != View.VISIBLE) return
         val (w, h) = view.measureSelf()
         val anchored = computeAnchoredPosition(w, h)
-        batteryAlertParams.x = anchored.x
-        batteryAlertParams.y = anchored.y
+        view.setPointerSide(anchored.side)
+
+        val (nx, ny) = view.nudgedPosition(anchored.x, anchored.y, anchored.side)
+        batteryAlertParams.x = nx
+        batteryAlertParams.y = ny
+
         windowManager.updateViewLayout(view, batteryAlertParams)
     }
 
@@ -555,7 +575,7 @@ class PetOverlayService : LifecycleService() {
         batteryAlertView = null
     }
 
-    // ==================== QUICK MENU (long press) ====================
+
 
     private fun ensureQuickMenu(): QuickMenuView {
         quickMenuView?.let { return it }
@@ -579,6 +599,7 @@ class PetOverlayService : LifecycleService() {
     private fun repositionQuickMenu(menu: QuickMenuView) {
         val (w, h) = menu.measureCard()
         val anchored = computeAnchoredPosition(w, h)
+        menu.setPointerSide(anchored.side)
         menu.positionCard(anchored.x, anchored.y)
     }
 
@@ -592,7 +613,8 @@ class PetOverlayService : LifecycleService() {
         menu.configureStatusPage("Cargando…") { openTimerApp() }
         menu.configureBrightnessPage(getCurrentBrightnessPercent()) { percent -> setBrightnessPercent(percent) }
         menu.configureVolumePage(getCurrentVolumePercent()) { percent -> setVolumePercent(percent) }
-        menu.configureSleepPage { PetOverlayService.stop(this@PetOverlayService) }
+        menu.configureSleepPage { PetController.sleep(this@PetOverlayService) }
+        menu.configureConfigButton { openConfigApp() }
         refreshSkinMenuPage(menu)
         repositionQuickMenu(menu)
 
@@ -683,7 +705,15 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    // ==================== BRILLO ====================
+    private fun openConfigApp() {
+        hideQuickMenu()
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+
 
     private fun getCurrentBrightnessPercent(): Int {
         return try {
@@ -717,7 +747,7 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    // ==================== VOLUMEN ====================
+
 
     private fun getCurrentVolumePercent(): Int {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -734,7 +764,7 @@ class PetOverlayService : LifecycleService() {
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, value, 0)
     }
 
-    // ==================== ESTADO CONTEXTUAL PERSISTENTE (noche/batería/audio) ====================
+
 
     private fun startContextualStateLoop() {
         lifecycleScope.launch {
@@ -790,7 +820,7 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    // ==================== VISTA Y GESTOS DE LA MASCOTA ====================
+
 
     private fun addOverlayView() {
         val sizePx = (PET_SIZE_DP * resources.displayMetrics.density).toInt()
@@ -826,7 +856,7 @@ class PetOverlayService : LifecycleService() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 if (System.currentTimeMillis() < suppressTapCallbacksUntil) return true
                 playReaction(petView, MascotaAnimState.TAP_SIMPLE)
-                showSpeechBubble(MotivationalPhrases.random())
+                showSpeechBubble(CharacterPhrases.random(currentSkinInfo.id))
                 return true
             }
 
@@ -857,6 +887,7 @@ class PetOverlayService : LifecycleService() {
                         tapTimestamps.clear()
                         suppressTapCallbacksUntil = now + TAP_SUPPRESSION_WINDOW_MS
                         playReaction(petView, MascotaAnimState.TRIPLE_TAP)
+                        toggleFlashlight()
                     }
                     true
                 }
@@ -883,7 +914,7 @@ class PetOverlayService : LifecycleService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("DarmixPet activo")
             .setContentText("Archi está vigilando tu tiempo de pantalla")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_darmixpet)
             .setOngoing(true)
             .build()
 
@@ -901,5 +932,18 @@ class PetOverlayService : LifecycleService() {
             val manager = getSystemService<NotificationManager>()
             manager?.createNotificationChannel(channel)
         }
+    }
+
+    private fun toggleFlashlight() {
+        val now = System.currentTimeMillis()
+        if (now - lastTorchToggleAt < TORCH_TOGGLE_COOLDOWN_MS) return
+        lastTorchToggleAt = now
+        val message = when (flashlight.toggle()) {
+            FlashlightController.Result.ON -> CharacterPhrases.torchOn(currentSkinInfo.id)
+            FlashlightController.Result.OFF -> CharacterPhrases.torchOff(currentSkinInfo.id)
+            FlashlightController.Result.NO_FLASH -> "Este teléfono no tiene linterna"
+            FlashlightController.Result.IN_USE -> "La cámara está en uso, no puedo encender la luz"
+        }
+        showSpeechBubble(message)
     }
 }
