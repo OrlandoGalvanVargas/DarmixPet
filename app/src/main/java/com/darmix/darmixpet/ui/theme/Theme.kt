@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 private val DarkColors = darkColorScheme(
     primary = DarkPrimary,
@@ -58,15 +59,7 @@ private val LightColors = lightColorScheme(
     outline = LightOutline
 )
 
-/**
- * Tema de DarmixPet. Usa siempre la paleta propia de la app (nunca el
- * "dynamic color" de Android 12+, que tomaría colores del fondo de pantalla
- * del usuario y anularía la identidad visual diseñada para la app).
- *
- * @param themeMode Claro / Oscuro / Seguir al sistema. Por defecto sigue al
- * sistema, pero AppListScreen ofrece cambiarlo y la preferencia se guarda
- * en ThemePreferences.
- */
+
 @Composable
 fun DarmixPetTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -79,10 +72,14 @@ fun DarmixPetTheme(
     }
 
     val colorScheme = if (useDarkTheme) DarkColors else LightColors
+    val extras = if (useDarkTheme) DarkDarmixColors else LightDarmixColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalDarmixColors provides extras) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = DarmixShapes,
+            content = content
+        )
+    }
 }
