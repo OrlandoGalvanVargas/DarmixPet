@@ -7,9 +7,9 @@ import java.util.Calendar
 
 object ContextualStateChecker {
 
-    private const val NIGHT_HOUR_START = 23 // 11 PM
-    private const val NIGHT_HOUR_END = 6    // 6 AM
-    private const val LOW_BATTERY_THRESHOLD = 20 // %
+    private const val NIGHT_HOUR_START = 23
+    private const val NIGHT_HOUR_END = 6
+    private const val LOW_BATTERY_THRESHOLD = 20
 
     fun isNightTime(): Boolean {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)

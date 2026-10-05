@@ -3,12 +3,15 @@ package com.darmix.darmixpet.monitor
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 
 object UsageStatsPermissionHelper {
 
-    // unsafeCheckOpNoThrow está disponible desde API 23, no requiere @RequiresApi(Q)
+
+    @RequiresApi(Build.VERSION_CODES.Q)
     fun hasUsageStatsPermission(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = appOps.unsafeCheckOpNoThrow(
