@@ -2,12 +2,9 @@ package com.darmix.darmixpet.mascota
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
-/**
- * Guarda y recupera qué skin eligió el usuario, y permite escuchar cambios
- * en tiempo real (para que PetOverlayService actualice la mascota sin
- * necesidad de reiniciar el servicio).
- */
+
 object SkinPreferences {
     private const val PREFS_NAME = "darmixpet_prefs"
     const val KEY_SELECTED_SKIN = "selected_skin_id"
@@ -21,7 +18,7 @@ object SkinPreferences {
     }
 
     fun setSelectedSkinId(context: Context, skinId: String) {
-        prefs(context).edit().putString(KEY_SELECTED_SKIN, skinId).apply()
+        prefs(context).edit { putString(KEY_SELECTED_SKIN, skinId) }
     }
 
     fun registerListener(context: Context, listener: SharedPreferences.OnSharedPreferenceChangeListener) {
