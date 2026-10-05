@@ -33,12 +33,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.activity.SystemBarStyle
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.darmix.darmixpet.ui.DarmixSplashScreen
 import com.darmix.darmixpet.ui.GuideDialog
 import com.darmix.darmixpet.ui.GuidePreferences
 
 class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -63,64 +66,81 @@ class MainActivity : ComponentActivity() {
             }
 
             DarmixPetTheme(themeMode = themeMode) {
-                val lifecycleOwner = LocalLifecycleOwner.current
+                var showSplash by remember { mutableStateOf(true) }
 
-                @RequiresApi(Build.VERSION_CODES.Q)
-                fun checkAllGranted() =
-                    OverlayPermissionHelper.hasOverlayPermission(context) &&
-                            UsageStatsPermissionHelper.hasUsageStatsPermission(context) &&
-                            NotificationPermissionHelper.hasNotificationPermission(context) &&
-                            BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context) &&
-                            AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context) &&
-                            BrightnessPermissionHelper.hasWriteSettingsPermission(context)
+                if (showSplash) {
+                    DarmixSplashScreen(onFinished = { showSplash = false })
+                } else {
 
-                var allGranted by remember { mutableStateOf(checkAllGranted()) }
-                var selectedTab by remember { mutableStateOf(AppScreen.APPS) }
+                    val lifecycleOwner = LocalLifecycleOwner.current
 
-                DisposableEffect(lifecycleOwner) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) {
-                            allGranted = checkAllGranted()
+                    @RequiresApi(Build.VERSION_CODES.Q)
+                    fun checkAllGranted() =
+                        OverlayPermissionHelper.hasOverlayPermission(context) &&
+                                UsageStatsPermissionHelper.hasUsageStatsPermission(context) &&
+                                NotificationPermissionHelper.hasNotificationPermission(context) &&
+                                BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context) &&
+                                AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context) &&
+                                BrightnessPermissionHelper.hasWriteSettingsPermission(context)
+
+                    var allGranted by remember { mutableStateOf(checkAllGranted()) }
+                    var selectedTab by remember { mutableStateOf(AppScreen.APPS) }
+
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                allGranted = checkAllGranted()
+                            }
                         }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                     }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-                }
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    bottomBar = {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        bottomBar = {
+                            if (allGranted) {
+                                BottomNavBar(current = selectedTab, onSelect = { selectedTab = it })
+                            }
+                        }
+                    ) { innerPadding ->
                         if (allGranted) {
-                            BottomNavBar(current = selectedTab, onSelect = { selectedTab = it })
-                        }
-                    }
-                ) { innerPadding ->
-                    if (allGranted) {
-                        LaunchedEffect(Unit) {
-                            PetOverlayService.start(context)
-                        }
-                        when (selectedTab) {
-                            AppScreen.APPS -> AppListScreen(modifier = Modifier.padding(innerPadding))
-                            AppScreen.MASCOT -> SkinSelectionScreen(modifier = Modifier.padding(innerPadding))
-                            AppScreen.SETTINGS -> SettingsScreen(
-                                modifier = Modifier.padding(innerPadding),
-                                currentThemeMode = themeMode,
-                                onThemeModeChange = { newMode ->
-                                    themeMode = newMode
-                                    ThemePreferences.setThemeMode(context, newMode)
-                                }
-                            )
-                        }
-                    } else {
-                        PermissionsScreen(onAllGranted = { allGranted = true })
-                    }
-                }
+                            LaunchedEffect(Unit) {
+                                PetOverlayService.start(context)
+                            }
+                            when (selectedTab) {
+                                AppScreen.APPS -> AppListScreen(
+                                    modifier = Modifier.padding(
+                                        innerPadding
+                                    )
+                                )
 
-                var showGuide by remember { mutableStateOf(false) }
-                LaunchedEffect(allGranted) {
-                    if (allGranted && !GuidePreferences.hasSeen(context)) showGuide = true
+                                AppScreen.MASCOT -> SkinSelectionScreen(
+                                    modifier = Modifier.padding(
+                                        innerPadding
+                                    )
+                                )
+
+                                AppScreen.SETTINGS -> SettingsScreen(
+                                    modifier = Modifier.padding(innerPadding),
+                                    currentThemeMode = themeMode,
+                                    onThemeModeChange = { newMode ->
+                                        themeMode = newMode
+                                        ThemePreferences.setThemeMode(context, newMode)
+                                    }
+                                )
+                            }
+                        } else {
+                            PermissionsScreen(onAllGranted = { allGranted = true })
+                        }
+                    }
+
+                    var showGuide by remember { mutableStateOf(false) }
+                    LaunchedEffect(allGranted) {
+                        if (allGranted && !GuidePreferences.hasSeen(context)) showGuide = true
+                    }
+                    if (showGuide && allGranted) GuideDialog(onDismiss = { showGuide = false })
                 }
-                if (showGuide && allGranted) GuideDialog(onDismiss = { showGuide = false })
             }
         }
     }
