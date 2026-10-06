@@ -3,13 +3,20 @@ package com.darmix.darmixpet
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.darmix.darmixpet.monitor.AccessibilityPermissionHelper
@@ -21,22 +28,17 @@ import com.darmix.darmixpet.overlay.OverlayPermissionHelper
 import com.darmix.darmixpet.overlay.PetOverlayService
 import com.darmix.darmixpet.ui.AppListScreen
 import com.darmix.darmixpet.ui.AppScreen
+import com.darmix.darmixpet.ui.DarmixSplashScreen
+import com.darmix.darmixpet.ui.GuideDialog
+import com.darmix.darmixpet.ui.GuidePreferences
 import com.darmix.darmixpet.ui.PermissionsScreen
 import com.darmix.darmixpet.ui.SettingsScreen
 import com.darmix.darmixpet.ui.SkinSelectionScreen
+import com.darmix.darmixpet.ui.UpdateHost
 import com.darmix.darmixpet.ui.components.BottomNavBar
 import com.darmix.darmixpet.ui.theme.DarmixPetTheme
 import com.darmix.darmixpet.ui.theme.ThemeMode
 import com.darmix.darmixpet.ui.theme.ThemePreferences
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.activity.SystemBarStyle
-import androidx.annotation.RequiresApi
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.darmix.darmixpet.ui.DarmixSplashScreen
-import com.darmix.darmixpet.ui.GuideDialog
-import com.darmix.darmixpet.ui.GuidePreferences
 
 class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -66,7 +68,7 @@ class MainActivity : ComponentActivity() {
             }
 
             DarmixPetTheme(themeMode = themeMode) {
-                var showSplash by remember { mutableStateOf(true) }
+                var showSplash by rememberSaveable { mutableStateOf(true) }
 
                 if (showSplash) {
                     DarmixSplashScreen(onFinished = { showSplash = false })
@@ -96,6 +98,11 @@ class MainActivity : ComponentActivity() {
                         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                     }
 
+                    var showGuide by remember { mutableStateOf(false) }
+                    LaunchedEffect(allGranted) {
+                        if (allGranted && !GuidePreferences.hasSeen(context)) showGuide = true
+                    }
+
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
@@ -109,18 +116,8 @@ class MainActivity : ComponentActivity() {
                                 PetOverlayService.start(context)
                             }
                             when (selectedTab) {
-                                AppScreen.APPS -> AppListScreen(
-                                    modifier = Modifier.padding(
-                                        innerPadding
-                                    )
-                                )
-
-                                AppScreen.MASCOT -> SkinSelectionScreen(
-                                    modifier = Modifier.padding(
-                                        innerPadding
-                                    )
-                                )
-
+                                AppScreen.APPS -> AppListScreen(modifier = Modifier.padding(innerPadding))
+                                AppScreen.MASCOT -> SkinSelectionScreen(modifier = Modifier.padding(innerPadding))
                                 AppScreen.SETTINGS -> SettingsScreen(
                                     modifier = Modifier.padding(innerPadding),
                                     currentThemeMode = themeMode,
@@ -135,11 +132,9 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    var showGuide by remember { mutableStateOf(false) }
-                    LaunchedEffect(allGranted) {
-                        if (allGranted && !GuidePreferences.hasSeen(context)) showGuide = true
-                    }
                     if (showGuide && allGranted) GuideDialog(onDismiss = { showGuide = false })
+
+                    UpdateHost(suppress = showGuide && allGranted)
                 }
             }
         }

@@ -12,13 +12,10 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-
 object DarmixIcons {
-
 
     val Overlay: ImageVector by lazy {
         icon("Overlay") {
-
             outline {
                 moveTo(8.5f, 13.5f); lineTo(6f, 13.5f)
                 arcTo(2.5f, 2.5f, 0f, false, true, 3.5f, 11f)
@@ -28,13 +25,11 @@ object DarmixIcons {
                 arcTo(2.5f, 2.5f, 0f, false, true, 15.5f, 6f)
                 lineTo(15.5f, 9.5f)
             }
-
             wash { rrect(8.5f, 9.5f, 12f, 11f, 2.5f) }
             outline { rrect(8.5f, 9.5f, 12f, 11f, 2.5f) }
             outline { moveTo(8.5f, 13.5f); lineTo(20.5f, 13.5f) }
         }
     }
-
 
     val Hourglass: ImageVector by lazy {
         icon("Hourglass") {
@@ -61,7 +56,6 @@ object DarmixIcons {
         }
     }
 
-
     val Bell: ImageVector by lazy {
         icon("Bell") {
             val body: PathBuilder.() -> Unit = {
@@ -85,7 +79,6 @@ object DarmixIcons {
         }
     }
 
-
     val Battery: ImageVector by lazy {
         icon("Battery") {
             wash { rrect(4.5f, 9f, 13f, 6f, 1.5f) }
@@ -97,7 +90,6 @@ object DarmixIcons {
             }
         }
     }
-
 
     val Eye: ImageVector by lazy {
         icon("Eye") {
@@ -114,7 +106,6 @@ object DarmixIcons {
         }
     }
 
-
     val Sun: ImageVector by lazy {
         icon("Sun") {
             wash { circle(12f, 12f, 4.2f) }
@@ -129,7 +120,6 @@ object DarmixIcons {
         }
     }
 
-
     val Check: ImageVector by lazy {
         icon("Check") {
             outline(width = 2.8f) {
@@ -137,7 +127,6 @@ object DarmixIcons {
             }
         }
     }
-
 
     val Sparkle: ImageVector by lazy {
         icon("Sparkle") {
@@ -153,7 +142,6 @@ object DarmixIcons {
             outline(width = 1.6f, block = star)
         }
     }
-
 
     val Hat: ImageVector by lazy {
         icon("Hat") {
@@ -171,7 +159,6 @@ object DarmixIcons {
         }
     }
 
-
     val AppsGrid: ImageVector by lazy {
         icon("AppsGrid") {
             wash { rrect(4f, 4f, 7f, 7f, 2.2f) }
@@ -182,7 +169,6 @@ object DarmixIcons {
             outline { rrect(13f, 13f, 7f, 7f, 2.2f) }
         }
     }
-
 
     val Paw: ImageVector by lazy {
         icon("Paw") {
@@ -208,7 +194,6 @@ object DarmixIcons {
         }
     }
 
-
     val Cog: ImageVector by lazy {
         icon("Cog") {
             val gear: PathBuilder.() -> Unit = {
@@ -232,7 +217,6 @@ object DarmixIcons {
         }
     }
 
-
     val Clock: ImageVector by lazy {
         icon("Clock") {
             wash { circle(12f, 13f, 8f) }
@@ -242,7 +226,6 @@ object DarmixIcons {
             outline { moveTo(12f, 2.8f); lineTo(12f, 5f) }
         }
     }
-
 
     val Snowflake: ImageVector by lazy {
         icon("Snowflake") {
@@ -269,7 +252,6 @@ object DarmixIcons {
         }
     }
 
-
     val Ticket: ImageVector by lazy {
         icon("Ticket") {
             val ticket: PathBuilder.() -> Unit = {
@@ -289,7 +271,6 @@ object DarmixIcons {
         }
     }
 
-
     val Lock: ImageVector by lazy {
         icon("Lock") {
             wash { rrect(5.5f, 10.5f, 13f, 10f, 3f) }
@@ -303,7 +284,6 @@ object DarmixIcons {
         }
     }
 
-
     val Search: ImageVector by lazy {
         icon("Search") {
             wash { circle(10.5f, 10.5f, 6f) }
@@ -311,7 +291,6 @@ object DarmixIcons {
             outline(width = 2.4f) { moveTo(15f, 15f); lineTo(20.5f, 20.5f) }
         }
     }
-
 
     val Close: ImageVector by lazy {
         icon("Close") {
@@ -322,7 +301,6 @@ object DarmixIcons {
         }
     }
 
-
     val Plus: ImageVector by lazy {
         icon("Plus") {
             outline(width = 2.8f) {
@@ -332,13 +310,11 @@ object DarmixIcons {
         }
     }
 
-
     val Minus: ImageVector by lazy {
         icon("Minus") {
             outline(width = 2.8f) { moveTo(5f, 12f); lineTo(19f, 12f) }
         }
     }
-
 
     val ChevronLeft: ImageVector by lazy {
         icon("ChevronLeft") {
@@ -346,13 +322,11 @@ object DarmixIcons {
         }
     }
 
-
     val ChevronRight: ImageVector by lazy {
         icon("ChevronRight") {
             outline(width = 2.8f) { moveTo(9f, 5f); lineTo(16f, 12f); lineTo(9f, 19f) }
         }
     }
-
 
     val Moon: ImageVector by lazy {
         icon("Moon") {
@@ -367,7 +341,6 @@ object DarmixIcons {
         }
     }
 
-
     val HalfCircle: ImageVector by lazy {
         icon("HalfCircle") {
             wash {
@@ -379,7 +352,6 @@ object DarmixIcons {
             outline { moveTo(12f, 3.5f); lineTo(12f, 20.5f) }
         }
     }
-
 
     val Heart: ImageVector by lazy {
         icon("Heart") {
@@ -398,7 +370,6 @@ object DarmixIcons {
         }
     }
 
-
     val Speaker: ImageVector by lazy {
         icon("Speaker") {
             val body: PathBuilder.() -> Unit = {
@@ -412,7 +383,6 @@ object DarmixIcons {
             outline { moveTo(18.6f, 7f); quadTo(22.4f, 12f, 18.6f, 17f) }
         }
     }
-
 
     val Flashlight: ImageVector by lazy {
         icon("Flashlight") {
@@ -430,8 +400,19 @@ object DarmixIcons {
             }
         }
     }
-}
 
+    val Download: ImageVector by lazy {
+        icon("Download") {
+            outline(width = 2.4f) {
+                moveTo(12f, 4f); lineTo(12f, 15f)
+                moveTo(7.5f, 10.8f); lineTo(12f, 15.3f); lineTo(16.5f, 10.8f)
+            }
+            outline {
+                moveTo(5f, 17.5f); lineTo(5f, 19.5f); lineTo(19f, 19.5f); lineTo(19f, 17.5f)
+            }
+        }
+    }
+}
 
 
 private fun icon(name: String, block: ImageVector.Builder.() -> Unit): ImageVector =
@@ -442,7 +423,6 @@ private fun icon(name: String, block: ImageVector.Builder.() -> Unit): ImageVect
         viewportWidth = 24f,
         viewportHeight = 24f
     ).apply(block).build()
-
 
 private fun ImageVector.Builder.outline(
     width: Float = 1.9f,
@@ -455,7 +435,6 @@ private fun ImageVector.Builder.outline(
     strokeLineJoin = StrokeJoin.Round,
     pathBuilder = block
 )
-
 
 private fun ImageVector.Builder.wash(block: PathBuilder.() -> Unit): ImageVector.Builder = path(
     fill = SolidColor(Color.Black),
