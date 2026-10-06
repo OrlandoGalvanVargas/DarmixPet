@@ -64,6 +64,13 @@ fun DarmixSplashScreen(onFinished: () -> Unit) {
             .firstOrNull { it.length > 2 && it !in setOf("Sir", "el", "la", "los", "las") }
             ?: skin.displayName
     }
+    val version = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+    }
     val dots = remember { Animatable(0f) }
     val shadow = remember { Animatable(0f) }
     val hatFall = remember { Animatable(0f) }
@@ -244,15 +251,17 @@ fun DarmixSplashScreen(onFinished: () -> Unit) {
             }
         }
 
-        Text(
-            text = "v1.0",
-            style = MaterialTheme.typography.labelSmall,
-            color = scheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 44.dp)
-                .graphicsLayer { alpha = tagline.value * 0.75f }
-        )
+        if (version.isNotBlank()) {
+            Text(
+                text = "v$version",
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 44.dp)
+                    .graphicsLayer { alpha = tagline.value * 0.75f }
+            )
+        }
     }
 }
 

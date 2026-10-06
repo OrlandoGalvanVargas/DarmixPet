@@ -14,8 +14,8 @@ android {
         applicationId = "com.darmix.darmixpet"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 1
+        versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,6 +34,17 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val mainOutput = variant.outputs.singleOrNull()
+        if (mainOutput != null) {
+            val vName = android.defaultConfig.versionName ?: "1.0"
+
+            (mainOutput as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set("DarmixPet-v${vName}.apk")
+        }
     }
 }
 
