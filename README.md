@@ -1,4 +1,3 @@
-
 <div align="center">
 
 <img src="docs/banner.png" alt="DarmixPet — Tu compañero de tiempo de pantalla" width="100%" />
@@ -63,6 +62,7 @@ suavemente al inicio con un mensaje cariñoso, y activa un periodo de
 <td width="50%" valign="top">
 
 ### 🎯 Vigilancia inteligente
+
 Elige qué apps quieres vigilar, define **cuánto tiempo** puedes usarlas por
 sesión, el **enfriamiento** entre sesiones y cuántas **sesiones al día**
 tienes disponibles.
@@ -71,6 +71,7 @@ tienes disponibles.
 <td width="50%" valign="top">
 
 ### 🪄 Mascota flotante
+
 Tres personajes con personalidad propia, sprites animados, frases
 motivadoras y reacciones a tus gestos. Se arrastra a donde no estorbe.
 
@@ -80,6 +81,7 @@ motivadoras y reacciones a tus gestos. Se arrastra a donde no estorbe.
 <td width="50%" valign="top">
 
 ### ⚡ Menú rápido
+
 Mantén presionada a tu mascota para abrir el menú: brillo, volumen,
 temporizador, cambio de personaje y acceso directo a ajustes.
 
@@ -87,6 +89,7 @@ temporizador, cambio de personaje y acceso directo a ajustes.
 <td width="50%" valign="top">
 
 ### 🔋 Avisos contextuales
+
 Se activa solo cuando tu batería está baja, cuando es muy tarde, o
 cuando detecta que estás escuchando música.
 
@@ -96,6 +99,7 @@ cuando detecta que estás escuchando música.
 <td width="50%" valign="top">
 
 ### 🎨 Diseño tipo sticker
+
 Cada personaje trae su propia estética: contornos gruesos, sombras
 sólidas desplazadas, tipografía redondeada (Fredoka + Nunito) y
 paletas cuidadas.
@@ -104,6 +108,7 @@ paletas cuidadas.
 <td width="50%" valign="top">
 
 ### 🌗 Tema claro / oscuro / sistema
+
 Se adapta a tu gusto. La preferencia se guarda y se respeta entre
 sesiones.
 
@@ -168,12 +173,12 @@ contigo.
 
 ### Requisitos
 
-| Requisito | Valor |
-|---|---|
-| **Android** | 8.0 Oreo (API 26) o superior |
-| **Arquitectura** | Universal |
-| **Espacio** | ~15 MB |
-| **Permisos** | 6 (ver abajo) |
+| Requisito        | Valor                        |
+| ---------------- | ---------------------------- |
+| **Android**      | 8.0 Oreo (API 26) o superior |
+| **Arquitectura** | Universal                    |
+| **Espacio**      | ~15 MB                       |
+| **Permisos**     | 6 (ver abajo)                |
 
 ### Pasos
 
@@ -208,12 +213,12 @@ esperar.
 > **Solo aparece si instalaste desde fuera de Google Play y tienes Android 13+.**
 > Es un paso **previo** que desbloquea los demás permisos.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá la pantalla **Información de la app** de DarmixPet |
-| 2 | Toca el menú **⋮** (arriba a la derecha) y elige **Permitir ajustes restringidos** |
-| 3 | Confirma con huella, PIN o patrón si te lo pide |
-| 4 | Vuelve a DarmixPet y toca **"Ya lo hice"** |
+| Paso | Acción                                                                             |
+| ---- | ---------------------------------------------------------------------------------- |
+| 1    | Se abrirá la pantalla **Información de la app** de DarmixPet                       |
+| 2    | Toca el menú **⋮** (arriba a la derecha) y elige **Permitir ajustes restringidos** |
+| 3    | Confirma con huella, PIN o patrón si te lo pide                                    |
+| 4    | Vuelve a DarmixPet y toca **"Ya lo hice"**                                         |
 
 <details>
 <summary>💡 ¿No ves la opción?</summary>
@@ -230,11 +235,11 @@ tócalo, acepta y regresa a la pantalla de información.
 
 Permite que tu mascota aparezca **flotando sobre el resto de apps**.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá la pantalla de DarmixPet |
-| 2 | Activa **"Permitir mostrar sobre otras apps"** |
-| 3 | Vuelve con el botón **Atrás** |
+| Paso | Acción                                         |
+| ---- | ---------------------------------------------- |
+| 1    | Se abrirá la pantalla de DarmixPet             |
+| 2    | Activa **"Permitir mostrar sobre otras apps"** |
+| 3    | Vuelve con el botón **Atrás**                  |
 
 <div align="center">
 <img src="docs/screenshots/perm_overlay.png" width="240" />
@@ -246,12 +251,12 @@ Permite que tu mascota aparezca **flotando sobre el resto de apps**.
 
 Permite medir **cuánto tiempo pasas en cada app** para aplicar tus límites.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá la pantalla de DarmixPet. Si ves una lista, busca **DarmixPet** y tócalo |
-| 2 | Activa **"Permitir acceso al uso"** |
-| 3 | Si aparece un aviso de seguridad, léelo y acepta |
-| 4 | Vuelve a DarmixPet |
+| Paso | Acción                                                                             |
+| ---- | ---------------------------------------------------------------------------------- |
+| 1    | Se abrirá la pantalla de DarmixPet. Si ves una lista, busca **DarmixPet** y tócalo |
+| 2    | Activa **"Permitir acceso al uso"**                                                |
+| 3    | Si aparece un aviso de seguridad, léelo y acepta                                   |
+| 4    | Vuelve a DarmixPet                                                                 |
 
 <div align="center">
 <img src="docs/screenshots/perm_usage.png" width="240" />
@@ -277,11 +282,11 @@ viva a tu mascota en segundo plano.
 
 Para que tu mascota **no se cierre sola** por ahorro de energía.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá la configuración de batería de DarmixPet |
-| 2 | Elige **Sin restricciones** (o **No optimizar** / **Permitir**) |
-| 3 | Vuelve a DarmixPet |
+| Paso | Acción                                                          |
+| ---- | --------------------------------------------------------------- |
+| 1    | Se abrirá la configuración de batería de DarmixPet              |
+| 2    | Elige **Sin restricciones** (o **No optimizar** / **Permitir**) |
+| 3    | Vuelve a DarmixPet                                              |
 
 <details>
 <summary>💡 Nota para Xiaomi, Huawei y otras marcas</summary>
@@ -303,13 +308,13 @@ Permite saber **al instante** cuándo abres una app vigilada, para
 bloquearla a tiempo. DarmixPet **solo lo usa para detectar qué app está
 abierta** — no lee mensajes, ni teclados, ni contraseñas.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá Accesibilidad |
-| 2 | Entra a **Apps descargadas** (o **Servicios instalados**) y toca DarmixPet |
-| 3 | Activa **Usar DarmixPet** |
-| 4 | Acepta el aviso de seguridad de Android |
-| 5 | Vuelve a DarmixPet |
+| Paso | Acción                                                                     |
+| ---- | -------------------------------------------------------------------------- |
+| 1    | Se abrirá Accesibilidad                                                    |
+| 2    | Entra a **Apps descargadas** (o **Servicios instalados**) y toca DarmixPet |
+| 3    | Activa **Usar DarmixPet**                                                  |
+| 4    | Acepta el aviso de seguridad de Android                                    |
+| 5    | Vuelve a DarmixPet                                                         |
 
 <div align="center">
 <img src="docs/screenshots/perm_accessibility.png" width="240" />
@@ -321,11 +326,11 @@ abierta** — no lee mensajes, ni teclados, ni contraseñas.
 
 Solo se usa para **ajustar el brillo** desde el menú rápido de la mascota.
 
-| Paso | Acción |
-|---|---|
-| 1 | Se abrirá la pantalla de DarmixPet |
-| 2 | Activa **"Permitir modificar los ajustes del sistema"** |
-| 3 | Vuelve a DarmixPet |
+| Paso | Acción                                                  |
+| ---- | ------------------------------------------------------- |
+| 1    | Se abrirá la pantalla de DarmixPet                      |
+| 2    | Activa **"Permitir modificar los ajustes del sistema"** |
+| 3    | Vuelve a DarmixPet                                      |
 
 <div align="center">
 <img src="docs/screenshots/perm_writesettings.png" width="240" />
@@ -342,7 +347,7 @@ Solo se usa para **ajustar el brillo** desde el menú rápido de la mascota.
 
 Si te molesta, puedes ocultarlo: mantén presionado el aviso → ⚙ → desactiva
 la notificación **"mostrándose sobre otras apps"** (aparece bajo
-*Android System*).
+_Android System_).
 
 > [!CAUTION]
 > **No desactives la notificación "DarmixPet activo"** — es la que mantiene
@@ -357,6 +362,7 @@ la notificación **"mostrándose sobre otras apps"** (aparece bajo
 <td valign="top" width="50%">
 
 **Lenguaje y UI**
+
 - Kotlin `2.x`
 - Jetpack Compose · Material 3
 - Compose Canvas para íconos y animaciones
@@ -366,6 +372,7 @@ la notificación **"mostrándose sobre otras apps"** (aparece bajo
 <td valign="top" width="50%">
 
 **Arquitectura**
+
 - `ComponentActivity` + Compose
 - `LifecycleService` para el overlay
 - `AccessibilityService` para detección instantánea
@@ -377,6 +384,7 @@ la notificación **"mostrándose sobre otras apps"** (aparece bajo
 <td valign="top" width="50%">
 
 **Persistencia**
+
 - Room (SQLite) para apps vigiladas
 - SharedPreferences para preferencias
 
@@ -384,6 +392,7 @@ la notificación **"mostrándose sobre otras apps"** (aparece bajo
 <td valign="top" width="50%">
 
 **Servicios del sistema**
+
 - `UsageStatsManager`
 - `WindowManager` (overlays)
 - `AccessibilityManager`
@@ -436,13 +445,23 @@ expresa del autor.
 
 ---
 
+## 📜 Historial de versiones
+
+Consulta el [**CHANGELOG.md**](CHANGELOG.md) para ver el registro completo de cambios de cada versión.
+
+| Versión  | Fecha      | Resumen                                                                                                      |
+| -------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| **v1.1** | 2026-10-06 | Nuevo ícono de la aplicación.                                                                                |
+| **v1.0** | 2026-10-06 | Lanzamiento inicial. Tres personajes, vigilancia de apps, menú rápido, avisos contextuales y diseño sticker. |
+
+---
+
 <div align="center">
 
 **Hecho con 💜 por Darmix**
 
 <sub>Si DarmixPet te ayuda a usar mejor tu tiempo, compártelo con quien lo necesite.</sub>
-
-<br /><br />
+<sub>[Changelog](CHANGELOG.md) · [Releases](../../releases) · [Reportar un bug](../../issues)</sub><br /><br />
 
 <img src="docs/characters/archi.png" width="60" />
 <img src="docs/characters/sylva.png" width="60" />
