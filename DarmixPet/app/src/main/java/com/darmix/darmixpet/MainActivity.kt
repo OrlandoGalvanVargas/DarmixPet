@@ -1,12 +1,10 @@
 package com.darmix.darmixpet
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,13 +37,14 @@ import com.darmix.darmixpet.ui.components.BottomNavBar
 import com.darmix.darmixpet.ui.theme.DarmixPetTheme
 import com.darmix.darmixpet.ui.theme.ThemeMode
 import com.darmix.darmixpet.ui.theme.ThemePreferences
+import com.darmix.darmixpet.update.UpdateManager
 
 class MainActivity : ComponentActivity() {
-    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             val context = LocalContext.current
             var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
@@ -55,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
+
             DisposableEffect(darkNow) {
                 enableEdgeToEdge(
                     statusBarStyle = SystemBarStyle.auto(
@@ -73,10 +73,8 @@ class MainActivity : ComponentActivity() {
                 if (showSplash) {
                     DarmixSplashScreen(onFinished = { showSplash = false })
                 } else {
-
                     val lifecycleOwner = LocalLifecycleOwner.current
 
-                    @RequiresApi(Build.VERSION_CODES.Q)
                     fun checkAllGranted() =
                         OverlayPermissionHelper.hasOverlayPermission(context) &&
                                 UsageStatsPermissionHelper.hasUsageStatsPermission(context) &&
@@ -87,6 +85,11 @@ class MainActivity : ComponentActivity() {
 
                     var allGranted by remember { mutableStateOf(checkAllGranted()) }
                     var selectedTab by remember { mutableStateOf(AppScreen.APPS) }
+
+                    LaunchedEffect(Unit) {
+                        UpdateManager.loadCached(context)
+                        UpdateManager.checkIfDue(context)
+                    }
 
                     DisposableEffect(lifecycleOwner) {
                         val observer = LifecycleEventObserver { _, event ->

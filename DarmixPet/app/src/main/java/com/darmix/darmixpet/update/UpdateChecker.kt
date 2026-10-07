@@ -29,19 +29,24 @@ object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
 
-    private const val LATEST_RELEASE_URL =
-        "https://api.github.com/repos/OrlandoGalvanVargas/DarmixPet/releases/latest"
+    // Agregamos timestamp dinámico para evitar la caché de CDN/servidor
+    private fun getLatestReleaseUrl(): String =
+        "https://api.github.com/repos/OrlandoGalvanVargas/DarmixPet/releases/latest?t=${System.currentTimeMillis()}"
 
     suspend fun check(): CheckResult = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(LATEST_RELEASE_URL).openConnection() as HttpURLConnection).apply {
+            connection = (URL(getLatestReleaseUrl()).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 6_000
                 readTimeout = 6_000
                 setRequestProperty("Accept", "application/vnd.github+json")
                 setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
                 setRequestProperty("User-Agent", "DarmixPet/${BuildConfig.VERSION_NAME}")
+                // EVITAR CACHÉ HTTP
+                setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
+                setRequestProperty("Pragma", "no-cache")
+                setRequestProperty("Expires", "0")
             }
             when (connection.responseCode) {
                 200 -> parse(connection.inputStream.bufferedReader().use { it.readText() })

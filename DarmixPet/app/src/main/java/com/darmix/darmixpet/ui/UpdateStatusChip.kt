@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +62,7 @@ import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
 import com.darmix.darmixpet.update.UpdateInfo
 import com.darmix.darmixpet.update.UpdateManager.CheckState
+import kotlinx.coroutines.launch
 
 private data class ChipSpec(val label: String, val icon: ImageVector, val fill: Color, val content: Color)
 
@@ -156,8 +158,22 @@ fun UpdateStatusDialog(
     val scheme = MaterialTheme.colorScheme
     val shown = if (state == CheckState.IDLE) CheckState.CHECKING else state
 
+    val enter = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    val handleDismiss = {
+        coroutineScope.launch {
+            enter.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium))
+            onDismiss()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        enter.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow))
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { handleDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         val enter = remember { Animatable(0f) }

@@ -405,13 +405,7 @@ private fun AboutCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val version = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
-        } catch (e: Exception) {
-            ""
-        }
-    }
+    val version = BuildConfig.VERSION_NAME
 
     // Tocar el sombrero lo hace saltar.
     val pop = remember { Animatable(1f) }

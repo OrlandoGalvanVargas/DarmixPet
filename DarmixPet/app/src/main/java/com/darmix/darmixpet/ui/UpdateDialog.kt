@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -36,6 +37,7 @@ import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
+import kotlinx.coroutines.launch
 
 private sealed interface NoteLine {
     data class Heading(val text: String) : NoteLine
@@ -82,16 +84,23 @@ fun UpdateDialog(
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val notes = remember(releaseNotes) { parseReleaseNotes(releaseNotes) }
+    val enter = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
 
+    val handleDismiss = {
+        coroutineScope.launch {
+            enter.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium))
+            onDismiss()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        enter.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow))
+    }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { handleDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) {
-            enter.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow))
-        }
-
         Column(
             modifier = Modifier
                 .padding(start = 20.dp, end = 24.dp, top = 24.dp, bottom = 28.dp)
