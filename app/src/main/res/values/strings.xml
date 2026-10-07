@@ -1,4 +1,0 @@
-<resources>
-    <string name="app_name">DarmixPet</string>
-    <string name="accessibility_service_description">Permite a DarmixPet detectar al instante cuándo abres una app monitoreada, para bloquearla de inmediato si está en tiempo de enfriamiento o sin sesiones disponibles.</string>
-</resources>
