@@ -4,7 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -37,6 +42,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -59,6 +66,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.darmix.darmixpet.BuildConfig
+import com.darmix.darmixpet.update.UpdateInfo
+import com.darmix.darmixpet.update.UpdateManager
 import com.darmix.darmixpet.ui.components.HatBadge
 import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
@@ -86,27 +96,54 @@ fun SettingsScreen(
     val scheme = MaterialTheme.colorScheme
     var showGuide by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val updateOffer by UpdateManager.offer.collectAsState()
+    val checkState by UpdateManager.checkState.collectAsState()
+    var showUpdateStatus by remember { mutableStateOf(false) }
+    // Si mientras se busca aparece una versión nueva, el diálogo de actualizar toma el relevo.
+    LaunchedEffect(updateOffer) { if (updateOffer != null) showUpdateStatus = false }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
-
-        Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)) {
-            Text(
-                "Ajustes",
-                style = MaterialTheme.typography.headlineMedium,
-                color = scheme.onBackground
-            )
-            Text(
-                "Personaliza a DarmixPet a tu gusto",
-                style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurfaceVariant
+        // ── Encabezado ──
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Ajustes",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = scheme.onBackground
+                )
+                Text(
+                    "Personaliza a DarmixPet a tu gusto",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            UpdateStatusChip(
+                offer = updateOffer,
+                checkState = checkState,
+                onClick = {
+                    if (updateOffer != null) {
+                        UpdateManager.requestDialog()
+                    } else {
+                        UpdateManager.checkNow(context)
+                        showUpdateStatus = true
+                    }
+                }
             )
         }
 
-
+        // ── Mascota ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Tu mascota", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
@@ -114,7 +151,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-
+        // ── Apariencia ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Apariencia", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
             Text(
@@ -153,7 +190,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-
+        // ── Ayuda ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Ayuda", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
@@ -167,19 +204,32 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-
+        // ── Acerca de ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Acerca de", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
-        AboutCard(modifier = Modifier.padding(start = 20.dp, end = 24.dp))
+        AboutCard(
+            modifier = Modifier.padding(start = 20.dp, end = 24.dp),
+            update = updateOffer,
+            onUpdateClick = { UpdateManager.requestDialog() }
+        )
     }
 
     if (showGuide) GuideDialog(onDismiss = { showGuide = false })
+
+    if (showUpdateStatus && updateOffer == null) {
+        UpdateStatusDialog(
+            state = checkState,
+            installedVersion = BuildConfig.VERSION_NAME,
+            onRetry = { UpdateManager.checkNow(context) },
+            onDismiss = { showUpdateStatus = false }
+        )
+    }
 }
 
+// ───────────────────────── Selector de tema ─────────────────────────
 
-
-
+/** Tarjeta con mini vista previa de la app en ese tema. Al elegirla se "hunde" sobre su sombra. */
 @Composable
 private fun ThemeOptionCard(
     label: String,
@@ -297,13 +347,13 @@ private fun ThemePreview(mode: ThemeMode, modifier: Modifier = Modifier) {
     }
 }
 
-
+/** Dibuja una miniatura de la lista de apps con la paleta dada. */
 private fun DrawScope.drawMiniScreen(p: MiniPalette) {
     val w = size.width
     val h = size.height
     drawRect(p.bg)
 
-
+    // Título
     drawRoundRect(
         color = p.text.copy(alpha = 0.75f),
         topLeft = Offset(w * 0.10f, h * 0.09f),
@@ -311,7 +361,7 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
         cornerRadius = CornerRadius(h * 0.035f)
     )
 
-
+    // Dos tarjetas tipo sticker
     for (i in 0..1) {
         val left = w * 0.08f
         val top = h * (0.27f + i * 0.30f)
@@ -323,16 +373,16 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
         drawRoundRect(p.surface, Offset(left, top), Size(cw, ch), corner)
         drawRoundRect(p.ink, Offset(left, top), Size(cw, ch), corner, style = Stroke(width = 1.2.dp.toPx()))
 
-
+        // "Icono" de la app
         drawCircle(p.primary, radius = ch * 0.26f, center = Offset(left + ch * 0.55f, top + ch / 2f))
-
+        // Línea de texto
         drawRoundRect(
             color = p.text.copy(alpha = 0.6f),
             topLeft = Offset(left + ch * 1.05f, top + ch * 0.40f),
             size = Size(cw * 0.32f, ch * 0.18f),
             cornerRadius = CornerRadius(ch * 0.09f)
         )
-
+        // Interruptor: encendido en la primera, apagado en la segunda
         drawRoundRect(
             color = if (i == 0) p.ok else p.ink.copy(alpha = 0.25f),
             topLeft = Offset(left + cw * 0.72f, top + ch * 0.30f),
@@ -342,10 +392,14 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
     }
 }
 
-
+// ───────────────────────── Acerca de ─────────────────────────
 
 @Composable
-private fun AboutCard(modifier: Modifier = Modifier) {
+private fun AboutCard(
+    modifier: Modifier = Modifier,
+    update: UpdateInfo? = null,
+    onUpdateClick: () -> Unit = {}
+) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val context = LocalContext.current
@@ -359,13 +413,42 @@ private fun AboutCard(modifier: Modifier = Modifier) {
         }
     }
 
-
+    // Tocar el sombrero lo hace saltar.
     val pop = remember { Animatable(1f) }
+
+    // Con una actualización pendiente la tarjeta se tiñe de dorado, late suavemente y se vuelve tocable.
+    val hasUpdate = update != null
+    val cardFill by animateColorAsState(
+        targetValue = if (hasUpdate) colors.goldContainer else scheme.surface,
+        animationSpec = tween(300),
+        label = "aboutFill"
+    )
+    val pulse = rememberInfiniteTransition(label = "aboutPulse").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "aboutPulseValue"
+    )
+    val aboutInteraction = remember { MutableInteractionSource() }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .sticker(shape = MaterialTheme.shapes.large, depth = 4.dp)
+            .graphicsLayer {
+                val s = if (hasUpdate) 1f + 0.015f * pulse.value else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .sticker(shape = MaterialTheme.shapes.large, fill = cardFill, depth = 4.dp)
+            .then(
+                if (hasUpdate) Modifier.clickable(
+                    interactionSource = aboutInteraction,
+                    indication = null,
+                    role = Role.Button,
+                    onClickLabel = "Ver la actualización",
+                    onClick = onUpdateClick
+                ) else Modifier
+            )
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -401,16 +484,26 @@ private fun AboutCard(modifier: Modifier = Modifier) {
         )
 
         Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (version.isNotBlank()) {
-                StatusBadge("Versión $version", DarmixIcons.Sparkle, colors.goldContainer, colors.onGoldContainer)
+        if (update != null) {
+            StatusBadge("Nueva versión v${update.latestVersion}", DarmixIcons.Download, colors.gold, colors.onGold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Toca aquí para actualizar",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onGoldContainer
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (version.isNotBlank()) {
+                    StatusBadge("Versión $version", DarmixIcons.Sparkle, colors.goldContainer, colors.onGoldContainer)
+                }
+                StatusBadge("Con cariño", DarmixIcons.Heart, colors.blockedContainer, colors.onBlockedContainer)
             }
-            StatusBadge("Con cariño", DarmixIcons.Heart, colors.blockedContainer, colors.onBlockedContainer)
         }
     }
 }
 
-
+// ───────────────────────── Entrada a la guía ─────────────────────────
 
 @Composable
 private fun GuideEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {

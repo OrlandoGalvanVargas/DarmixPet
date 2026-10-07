@@ -5,101 +5,90 @@ import android.net.Network
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.darmix.darmixpet.BuildConfig
-import com.darmix.darmixpet.update.CheckResult
 import com.darmix.darmixpet.update.UpdateChecker
-import com.darmix.darmixpet.update.UpdateInfo
-import com.darmix.darmixpet.update.UpdateStore
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.darmix.darmixpet.update.UpdateManager
 
-private const val CHECK_INTERVAL_MS = 6L * 60 * 60 * 1000
-
+/**
+ * Anfitrión del aviso de actualización. Ponlo una sola vez por encima de las pantallas.
+ *
+ *  - Al abrir la app comprueba en silencio (como máximo cada 6 h) y, si hay versión nueva, abre el
+ *    diálogo UNA vez por apertura; "Más tarde" lo cierra hasta la próxima apertura.
+ *  - También abre el diálogo cuando se lo piden desde Ajustes (UpdateManager.requestDialog()).
+ *  - Sin internet no muestra nada; reintenta solo cuando vuelve la conexión.
+ *
+ * @param suppress true para esconder el diálogo un momento (por ejemplo, mientras se ve la guía).
+ */
 @Composable
 fun UpdateHost(suppress: Boolean = false) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val offer by UpdateManager.offer.collectAsState()
+    val request by UpdateManager.dialogRequest.collectAsState()
 
-    var offer by remember { mutableStateOf<UpdateInfo?>(null) }
-    var dismissed by rememberSaveable { mutableStateOf(false) }
-    var needsRetry by remember { mutableStateOf(false) }
-    var checking by remember { mutableStateOf(false) }
+    var dialogOpen by rememberSaveable { mutableStateOf(false) }
+    var autoPrompted by rememberSaveable { mutableStateOf(false) }
+    var handledRequest by rememberSaveable { mutableStateOf(0) }
 
-    fun runCheck() {
-        if (checking) return
-        checking = true
-        scope.launch {
-            when (val result = UpdateChecker.check()) {
-                is CheckResult.Update -> {
-                    UpdateStore.saveOffer(context, result.info)
-                    UpdateStore.markChecked(context)
-                    offer = result.info
-                    needsRetry = false
-                }
-                CheckResult.UpToDate -> {
-                    UpdateStore.clearOffer(context)
-                    UpdateStore.markChecked(context)
-                    offer = null
-                    needsRetry = false
-                }
-                CheckResult.Failed -> needsRetry = true
-            }
-            checking = false
-        }
-    }
-
+    // Al abrir: lo guardado primero (instantáneo, funciona sin internet) y luego, si toca, GitHub.
     LaunchedEffect(Unit) {
-        val cached = UpdateStore.cachedOffer(context)
-        if (cached != null) {
-            if (UpdateChecker.isNewerThanInstalled(cached.latestVersion)) offer = cached
-            else UpdateStore.clearOffer(context)
-        }
-        if (System.currentTimeMillis() - UpdateStore.lastCheck(context) > CHECK_INTERVAL_MS) runCheck()
+        UpdateManager.loadCached(context)
+        UpdateManager.checkIfDue(context)
     }
 
+    // Cuando vuelve el internet, el administrador reintenta una sola vez y sin avisar de nada.
     DisposableEffect(Unit) {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (needsRetry) {
-                    scope.launch {
-                        delay(2_000)
-                        if (needsRetry) runCheck()
-                    }
-                }
+                UpdateManager.onNetworkAvailable(context)
             }
         }
         val registered = try {
             cm?.registerDefaultNetworkCallback(callback)
             true
         } catch (e: Exception) {
-            false
+            false // sin ACCESS_NETWORK_STATE simplemente se reintenta en la próxima apertura
         }
         onDispose {
             if (registered) {
-                try { cm?.unregisterNetworkCallback(callback) } catch (e: Exception) { }
+                try { cm?.unregisterNetworkCallback(callback) } catch (e: Exception) { /* nada */ }
             }
         }
     }
 
+    // Primera vez que hay oferta en esta apertura: se muestra sola.
+    LaunchedEffect(offer) {
+        if (offer != null && !autoPrompted) {
+            autoPrompted = true
+            dialogOpen = true
+        }
+    }
+
+    // Petición explícita desde Ajustes (chip o tarjeta "Acerca de").
+    LaunchedEffect(request) {
+        if (request > handledRequest) {
+            handledRequest = request
+            if (offer != null) dialogOpen = true
+        }
+    }
+
     val current = offer
-    if (current != null && !dismissed && !suppress) {
+    if (dialogOpen && current != null && !suppress) {
         UpdateDialog(
             latestVersion = current.latestVersion,
             currentVersion = BuildConfig.VERSION_NAME,
             releaseNotes = current.releaseNotes,
             onUpdateClick = {
                 UpdateChecker.openDownloadUrl(context, current.downloadUrl)
-                dismissed = true
+                dialogOpen = false
             },
-            onDismiss = { dismissed = true }
+            onDismiss = { dialogOpen = false }
         )
     }
 }
