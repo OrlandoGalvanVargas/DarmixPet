@@ -29,7 +29,6 @@ object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
 
-    // Agregamos timestamp dinámico para evitar la caché de CDN/servidor
     private fun getLatestReleaseUrl(): String =
         "https://api.github.com/repos/OrlandoGalvanVargas/DarmixPet/releases/latest?t=${System.currentTimeMillis()}"
 

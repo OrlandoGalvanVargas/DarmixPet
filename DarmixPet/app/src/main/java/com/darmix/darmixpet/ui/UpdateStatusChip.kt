@@ -66,13 +66,6 @@ import kotlinx.coroutines.launch
 
 private data class ChipSpec(val label: String, val icon: ImageVector, val fill: Color, val content: Color)
 
-/**
- * Indicador de actualización para la esquina del encabezado de Ajustes:
- *  - hay versión nueva  -> "Actualizar" dorado que late
- *  - buscando           -> "Buscando…" con un destello girando
- *  - ya está al día     -> "Al día" en verde
- *  - sin dato todavía   -> "Revisar"
- */
 @Composable
 fun UpdateStatusChip(
     offer: UpdateInfo?,
@@ -147,7 +140,6 @@ fun UpdateStatusChip(
     }
 }
 
-/** Resultado de buscar actualizaciones cuando no hay ninguna nueva (o no se pudo comprobar). */
 @Composable
 fun UpdateStatusDialog(
     state: CheckState,

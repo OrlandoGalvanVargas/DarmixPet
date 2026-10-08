@@ -100,7 +100,6 @@ fun SettingsScreen(
     val updateOffer by UpdateManager.offer.collectAsState()
     val checkState by UpdateManager.checkState.collectAsState()
     var showUpdateStatus by remember { mutableStateOf(false) }
-    // Si mientras se busca aparece una versión nueva, el diálogo de actualizar toma el relevo.
     LaunchedEffect(updateOffer) { if (updateOffer != null) showUpdateStatus = false }
 
     Column(
@@ -109,7 +108,6 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
-        // ── Encabezado ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -143,7 +141,6 @@ fun SettingsScreen(
             )
         }
 
-        // ── Mascota ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Tu mascota", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
@@ -151,7 +148,6 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        // ── Apariencia ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Apariencia", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
             Text(
@@ -190,7 +186,6 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        // ── Ayuda ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Ayuda", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
@@ -204,7 +199,6 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        // ── Acerca de ──
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Acerca de", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
@@ -227,9 +221,7 @@ fun SettingsScreen(
     }
 }
 
-// ───────────────────────── Selector de tema ─────────────────────────
 
-/** Tarjeta con mini vista previa de la app en ese tema. Al elegirla se "hunde" sobre su sombra. */
 @Composable
 private fun ThemeOptionCard(
     label: String,
@@ -347,7 +339,6 @@ private fun ThemePreview(mode: ThemeMode, modifier: Modifier = Modifier) {
     }
 }
 
-/** Dibuja una miniatura de la lista de apps con la paleta dada. */
 private fun DrawScope.drawMiniScreen(p: MiniPalette) {
     val w = size.width
     val h = size.height
@@ -361,7 +352,6 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
         cornerRadius = CornerRadius(h * 0.035f)
     )
 
-    // Dos tarjetas tipo sticker
     for (i in 0..1) {
         val left = w * 0.08f
         val top = h * (0.27f + i * 0.30f)
@@ -373,16 +363,13 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
         drawRoundRect(p.surface, Offset(left, top), Size(cw, ch), corner)
         drawRoundRect(p.ink, Offset(left, top), Size(cw, ch), corner, style = Stroke(width = 1.2.dp.toPx()))
 
-        // "Icono" de la app
         drawCircle(p.primary, radius = ch * 0.26f, center = Offset(left + ch * 0.55f, top + ch / 2f))
-        // Línea de texto
         drawRoundRect(
             color = p.text.copy(alpha = 0.6f),
             topLeft = Offset(left + ch * 1.05f, top + ch * 0.40f),
             size = Size(cw * 0.32f, ch * 0.18f),
             cornerRadius = CornerRadius(ch * 0.09f)
         )
-        // Interruptor: encendido en la primera, apagado en la segunda
         drawRoundRect(
             color = if (i == 0) p.ok else p.ink.copy(alpha = 0.25f),
             topLeft = Offset(left + cw * 0.72f, top + ch * 0.30f),
@@ -392,7 +379,6 @@ private fun DrawScope.drawMiniScreen(p: MiniPalette) {
     }
 }
 
-// ───────────────────────── Acerca de ─────────────────────────
 
 @Composable
 private fun AboutCard(
@@ -407,10 +393,8 @@ private fun AboutCard(
 
     val version = BuildConfig.VERSION_NAME
 
-    // Tocar el sombrero lo hace saltar.
     val pop = remember { Animatable(1f) }
 
-    // Con una actualización pendiente la tarjeta se tiñe de dorado, late suavemente y se vuelve tocable.
     val hasUpdate = update != null
     val cardFill by animateColorAsState(
         targetValue = if (hasUpdate) colors.goldContainer else scheme.surface,
@@ -497,7 +481,6 @@ private fun AboutCard(
     }
 }
 
-// ───────────────────────── Entrada a la guía ─────────────────────────
 
 @Composable
 private fun GuideEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
