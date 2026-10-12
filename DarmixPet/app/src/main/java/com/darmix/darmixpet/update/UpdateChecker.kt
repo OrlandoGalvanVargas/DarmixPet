@@ -29,6 +29,8 @@ object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
 
+    const val OFFICIAL_PAGE_URL = "https://darmixista.dev/darmixpet/"
+
     private fun getLatestReleaseUrl(): String =
         "https://api.github.com/repos/OrlandoGalvanVargas/DarmixPet/releases/latest?t=${System.currentTimeMillis()}"
 
@@ -42,7 +44,6 @@ object UpdateChecker {
                 setRequestProperty("Accept", "application/vnd.github+json")
                 setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
                 setRequestProperty("User-Agent", "DarmixPet/${BuildConfig.VERSION_NAME}")
-                // EVITAR CACHÉ HTTP
                 setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
                 setRequestProperty("Expires", "0")
@@ -109,7 +110,9 @@ object UpdateChecker {
             ?.split(".")?.mapNotNull { it.toIntOrNull() }
             ?: emptyList()
 
-    fun openDownloadUrl(context: Context, url: String) {
+    fun openDownloadUrl(context: Context, url: String) = openUrl(context, url)
+
+    fun openUrl(context: Context, url: String) {
         if (url.isBlank()) return
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

@@ -3,6 +3,7 @@ package com.darmix.darmixpet.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,7 +28,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -37,6 +41,7 @@ import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
+import com.darmix.darmixpet.update.UpdateChecker
 import kotlinx.coroutines.launch
 
 private sealed interface NoteLine {
@@ -84,6 +89,7 @@ fun UpdateDialog(
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val notes = remember(releaseNotes) { parseReleaseNotes(releaseNotes) }
+    val context = LocalContext.current
     val enter = remember { Animatable(0f) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -187,14 +193,27 @@ fun UpdateDialog(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "Se abrirá tu navegador para descargar el APK. Al terminar, ábrelo para instalar " +
-                        "(Android puede pedirte permiso para instalar desde el navegador).",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            Spacer(Modifier.height(8.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "¿No se descarga o tienes problemas?",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "Ir a la web",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = scheme.onPrimaryContainer,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Abrir la página oficial de DarmixPet"
+                        ) { UpdateChecker.openUrl(context, UpdateChecker.OFFICIAL_PAGE_URL) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             Row(
@@ -203,7 +222,7 @@ fun UpdateDialog(
             ) {
                 SquishButton(
                     text = "Más tarde",
-                    onClick = onDismiss,
+                    onClick = { handleDismiss() },
                     modifier = Modifier.weight(1f),
                     container = scheme.surface,
                     content = scheme.onSurface,
