@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +43,7 @@ import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
+import com.darmix.darmixpet.update.ApkDownloader
 import com.darmix.darmixpet.update.UpdateChecker
 import kotlinx.coroutines.launch
 
@@ -84,7 +87,9 @@ fun UpdateDialog(
     currentVersion: String,
     releaseNotes: String,
     onUpdateClick: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    downloadState: ApkDownloader.State = ApkDownloader.State.Idle,
+    onInstallClick: () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
@@ -193,6 +198,11 @@ fun UpdateDialog(
                 }
             }
 
+            if (downloadState !is ApkDownloader.State.Idle) {
+                Spacer(Modifier.height(14.dp))
+                DownloadStatus(downloadState)
+            }
+
             Spacer(Modifier.height(8.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -221,21 +231,101 @@ fun UpdateDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SquishButton(
-                    text = "Más tarde",
+                    text = if (downloadState is ApkDownloader.State.Downloading) "Ocultar" else "Más tarde",
                     onClick = { handleDismiss() },
                     modifier = Modifier.weight(1f),
                     container = scheme.surface,
                     content = scheme.onSurface,
                     fillWidth = true
                 )
-                SquishButton(
-                    text = "Descargar",
-                    onClick = onUpdateClick,
-                    modifier = Modifier.weight(1.3f),
-                    icon = DarmixIcons.Download,
-                    fillWidth = true
-                )
+                when (downloadState) {
+                    is ApkDownloader.State.Downloading -> SquishButton(
+                        text = downloadState.progress?.let { "${(it * 100).toInt()}%" } ?: "Descargando…",
+                        onClick = {},
+                        modifier = Modifier.weight(1.3f),
+                        icon = DarmixIcons.Download,
+                        fillWidth = true
+                    )
+
+                    is ApkDownloader.State.Ready -> SquishButton(
+                        text = "Instalar",
+                        onClick = onInstallClick,
+                        modifier = Modifier.weight(1.3f),
+                        icon = DarmixIcons.Sparkle,
+                        fillWidth = true
+                    )
+
+                    is ApkDownloader.State.Failed -> SquishButton(
+                        text = "Reintentar",
+                        onClick = onUpdateClick,
+                        modifier = Modifier.weight(1.3f),
+                        icon = DarmixIcons.Download,
+                        fillWidth = true
+                    )
+
+                    ApkDownloader.State.Idle -> SquishButton(
+                        text = "Descargar",
+                        onClick = onUpdateClick,
+                        modifier = Modifier.weight(1.3f),
+                        icon = DarmixIcons.Download,
+                        fillWidth = true
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun DownloadStatus(state: ApkDownloader.State) {
+    val scheme = MaterialTheme.colorScheme
+    val (title, detail) = when (state) {
+        is ApkDownloader.State.Downloading -> "Descargando actualización…" to
+                "Puedes ocultar este aviso, la descarga sigue en segundo plano."
+        is ApkDownloader.State.Ready -> "¡Descarga lista!" to
+                "Toca Instalar y confirma en la pantalla de Android."
+        is ApkDownloader.State.Failed -> "No se pudo descargar" to
+                "Revisa tu conexión e inténtalo de nuevo."
+        ApkDownloader.State.Idle -> return
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+        when (state) {
+            is ApkDownloader.State.Downloading -> {
+                val barModifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                val progress = state.progress
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = barModifier,
+                        color = scheme.primary,
+                        trackColor = scheme.surfaceVariant
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = barModifier,
+                        color = scheme.primary,
+                        trackColor = scheme.surfaceVariant
+                    )
+                }
+            }
+            is ApkDownloader.State.Ready -> LinearProgressIndicator(
+                progress = { 1f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp)),
+                color = scheme.primary,
+                trackColor = scheme.surfaceVariant
+            )
+            else -> Unit
+        }
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
     }
 }
