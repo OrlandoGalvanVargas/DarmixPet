@@ -177,7 +177,7 @@ contigo.
 | ---------------- | ---------------------------- |
 | **Android**      | 8.0 Oreo (API 26) o superior |
 | **Arquitectura** | Universal                    |
-| **Espacio**      | ~15 MB                       |
+| **Espacio**      | ~17 MB                       |
 | **Permisos**     | 6 (ver abajo)                |
 
 ### Pasos
