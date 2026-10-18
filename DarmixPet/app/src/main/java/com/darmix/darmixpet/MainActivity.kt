@@ -38,6 +38,7 @@ import com.darmix.darmixpet.ui.theme.DarmixPetTheme
 import com.darmix.darmixpet.ui.theme.ThemeMode
 import com.darmix.darmixpet.ui.theme.ThemePreferences
 import com.darmix.darmixpet.update.UpdateManager
+import com.darmix.darmixpet.notifications.NotificationAccessHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
                         OverlayPermissionHelper.hasOverlayPermission(context) &&
                                 UsageStatsPermissionHelper.hasUsageStatsPermission(context) &&
                                 NotificationPermissionHelper.hasNotificationPermission(context) &&
+                                NotificationAccessHelper.isNotificationAccessGranted(context) &&
                                 BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context) &&
                                 AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context) &&
                                 BrightnessPermissionHelper.hasWriteSettingsPermission(context)

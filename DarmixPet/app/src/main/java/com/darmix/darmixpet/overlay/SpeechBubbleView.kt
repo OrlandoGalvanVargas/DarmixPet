@@ -13,8 +13,12 @@ import com.darmix.darmixpet.mascota.BubbleShapeStyle
 import com.darmix.darmixpet.mascota.MascotThemeSpec
 import kotlin.math.max
 
+class SpeechBubbleView(context: Context) : FrameLayout(context), PetAnchoredElement {
 
-class SpeechBubbleView(context: Context) : FrameLayout(context) {
+    private companion object {
+        const val BODY_GAP_DP = 14
+        const val TAIL_SCALE = 0.8f
+    }
 
     private val label: TextView
     private val painter = StickerPainter(context)
@@ -22,9 +26,13 @@ class SpeechBubbleView(context: Context) : FrameLayout(context) {
 
     private var theme: MascotThemeSpec? = null
     private var pointerSide: BubblePointerSide = BubblePointerSide.NONE
+    private var tailOffsetPx = 0f
 
     private var tick = 0f
     private var ticker: ValueAnimator? = null
+
+    override val anchorInsetPx: Float get() = painter.insetPx
+    override val anchorGapPx: Float get() = BODY_GAP_DP * density
 
     init {
         alpha = 0f
@@ -41,6 +49,8 @@ class SpeechBubbleView(context: Context) : FrameLayout(context) {
         if (spec == theme) return
         theme = spec
         painter.setTheme(spec)
+        painter.tailScale = TAIL_SCALE
+        painter.insetOverridePx = painter.tailReachPx + 4f * density
 
         val inset = painter.insetPx.toInt()
         setPadding(inset, inset, inset, inset)
@@ -57,9 +67,10 @@ class SpeechBubbleView(context: Context) : FrameLayout(context) {
         invalidate()
     }
 
-    fun setPointerSide(side: BubblePointerSide) {
-        if (pointerSide == side) return
+    override fun applyAnchor(side: BubblePointerSide, tailOffsetPx: Float) {
+        this.tailOffsetPx = tailOffsetPx
         pointerSide = side
+        painter.tailAnchorPx = tailOffsetPx - painter.insetPx
         invalidate()
     }
 
@@ -67,7 +78,6 @@ class SpeechBubbleView(context: Context) : FrameLayout(context) {
         label.text = text
         requestLayout()
     }
-
 
     fun popIn(durationMs: Long) {
         animate().cancel()
@@ -98,10 +108,10 @@ class SpeechBubbleView(context: Context) : FrameLayout(context) {
         val h = max(height, measuredHeight).toFloat()
         val inset = painter.insetPx
         when (pointerSide) {
-            BubblePointerSide.LEFT -> { pivotX = inset; pivotY = h / 2f }
-            BubblePointerSide.RIGHT -> { pivotX = w - inset; pivotY = h / 2f }
-            BubblePointerSide.TOP -> { pivotX = w / 2f; pivotY = inset }
-            BubblePointerSide.BOTTOM -> { pivotX = w / 2f; pivotY = h - inset }
+            BubblePointerSide.LEFT -> { pivotX = inset; pivotY = tailOffsetPx }
+            BubblePointerSide.RIGHT -> { pivotX = w - inset; pivotY = tailOffsetPx }
+            BubblePointerSide.TOP -> { pivotX = tailOffsetPx; pivotY = inset }
+            BubblePointerSide.BOTTOM -> { pivotX = tailOffsetPx; pivotY = h - inset }
             BubblePointerSide.NONE -> { pivotX = w / 2f; pivotY = h / 2f }
         }
     }

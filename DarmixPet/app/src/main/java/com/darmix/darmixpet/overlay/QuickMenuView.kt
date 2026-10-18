@@ -28,8 +28,7 @@ import com.darmix.darmixpet.mascota.MascotThemeSpec
 import kotlin.math.abs
 
 
-class QuickMenuView(context: Context) : FrameLayout(context) {
-
+class QuickMenuView(context: Context) : FrameLayout(context), PetAnchoredElement {
     companion object {
         private const val CARD_WIDTH_DP = 252
         private const val SKIN_PREVIEW_SIZE_DP = 64
@@ -39,7 +38,6 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
         private const val BODY_GAP_DP = 14
 
 
-        private const val SERVICE_GAP_DP = 4
         private const val MENU_TAIL_SCALE = 0.8f
         private const val SLEEP_ARM_MS = 3000L
     }
@@ -51,6 +49,11 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
     private val card = StickerCardLayout(context, painter)
     private var theme: MascotThemeSpec? = null
     private var pointerSide = BubblePointerSide.NONE
+
+    private var tailOffsetPx = 0f
+
+    override val anchorInsetPx: Float get() = painter.insetPx
+    override val anchorGapPx: Float get() = BODY_GAP_DP * d
 
     private val fredoka: Typeface? = ResourcesCompat.getFont(context, R.font.fredoka_semibold)
     private val fredokaBold: Typeface? = ResourcesCompat.getFont(context, R.font.fredoka_bold)
@@ -417,10 +420,11 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
         if (ColorUtils.calculateLuminance(bg) > 0.45) ink else Color.WHITE
 
 
-    fun setPointerSide(side: BubblePointerSide) {
-        if (pointerSide == side) return
+    override fun applyAnchor(side: BubblePointerSide, tailOffsetPx: Float) {
+        this.tailOffsetPx = tailOffsetPx
         pointerSide = side
         card.side = side
+        painter.tailAnchorPx = tailOffsetPx - painter.insetPx
         card.invalidate()
     }
 
@@ -537,18 +541,8 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
 
 
     fun positionCard(x: Int, y: Int) {
-        val nudge = (painter.insetPx + SERVICE_GAP_DP * d - BODY_GAP_DP * d).coerceAtLeast(0f)
-        var tx = x.toFloat()
-        var ty = y.toFloat()
-        when (pointerSide) {
-            BubblePointerSide.LEFT -> tx -= nudge
-            BubblePointerSide.RIGHT -> tx += nudge
-            BubblePointerSide.TOP -> ty -= nudge
-            BubblePointerSide.BOTTOM -> ty += nudge
-            BubblePointerSide.NONE -> {}
-        }
-        card.translationX = tx
-        card.translationY = ty
+        card.translationX = x.toFloat()
+        card.translationY = y.toFloat()
 
         if (!entered) {
             entered = true
@@ -573,10 +567,10 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
         val h = card.measuredHeight.toFloat()
         val tip = 4f * d
         when (pointerSide) {
-            BubblePointerSide.LEFT -> { card.pivotX = tip; card.pivotY = 35f * d }
-            BubblePointerSide.RIGHT -> { card.pivotX = w - tip; card.pivotY = 35f * d }
-            BubblePointerSide.TOP -> { card.pivotX = w / 2f; card.pivotY = tip }
-            BubblePointerSide.BOTTOM -> { card.pivotX = w / 2f; card.pivotY = h - tip }
+            BubblePointerSide.LEFT -> { card.pivotX = tip; card.pivotY = tailOffsetPx }
+            BubblePointerSide.RIGHT -> { card.pivotX = w - tip; card.pivotY = tailOffsetPx }
+            BubblePointerSide.TOP -> { card.pivotX = tailOffsetPx; card.pivotY = tip }
+            BubblePointerSide.BOTTOM -> { card.pivotX = tailOffsetPx; card.pivotY = h - tip }
             BubblePointerSide.NONE -> { card.pivotX = w / 2f; card.pivotY = h / 2f }
         }
         card.alpha = 0f
@@ -644,7 +638,7 @@ class QuickMenuView(context: Context) : FrameLayout(context) {
 }
 
 
-private class StickerCardLayout(
+internal class StickerCardLayout(
     context: Context,
     private val painter: StickerPainter
 ) : LinearLayout(context) {

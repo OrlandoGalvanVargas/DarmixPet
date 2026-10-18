@@ -20,32 +20,18 @@ import com.darmix.darmixpet.mascota.MascotThemeSpec
 import kotlin.math.PI
 import kotlin.math.cos
 
-/**
- * Alerta persistente de batería baja. Mantiene la API anterior (setTheme, setPercentText,
- * measureSelf, startBlink, stopBlink) pero:
- *  - en vez de parpadear entera (poco legible), late suavemente con un halo de aviso;
- *  - muestra una pila dibujada que se llena según el porcentaje, con un rayito;
- *  - habla con la voz del personaje y se vuelve más urgente por debajo del 10%;
- *  - tiene una "x" para indicar que se puede cerrar tocándola;
- *  - apunta a la mascota (setPointerSide).
- */
 class BatteryAlertView(
     context: Context,
     private val onDismiss: () -> Unit
-) : FrameLayout(context) {
+) : FrameLayout(context), PetAnchoredElement {
 
     private val d = resources.displayMetrics.density
     private val painter = StickerPainter(context)
 
     private companion object {
-        /** Distancia deseada entre la mascota y el cuerpo de la alerta (el Quick Menu usa 14). */
         const val BODY_GAP_DP = 10
-
-        /** Hueco que ya deja computeAnchoredPosition en el servicio (BUBBLE_GAP_DP). */
-        const val SERVICE_GAP_DP = 4
         const val TAIL_SCALE = 0.75f
     }
-
     private val percentLabel: TextView
     private val messageLabel: TextView
     private val column: LinearLayout
@@ -112,9 +98,12 @@ class BatteryAlertView(
         invalidate()
     }
 
-    fun setPointerSide(side: BubblePointerSide) {
-        if (pointerSide == side) return
+    override val anchorInsetPx: Float get() = painter.insetPx
+    override val anchorGapPx: Float get() = BODY_GAP_DP * d
+
+    override fun applyAnchor(side: BubblePointerSide, tailOffsetPx: Float) {
         pointerSide = side
+        painter.tailAnchorPx = tailOffsetPx - painter.insetPx
         invalidate()
     }
 
@@ -166,23 +155,6 @@ class BatteryAlertView(
         animator = null
         super.onDetachedFromWindow()
     }
-
-    /**
-     * Posición final de la ventana: acerca el cuerpo de la alerta a la mascota (BODY_GAP_DP)
-     * compensando el margen transparente del pico. Úsala en lugar de anchored.x / anchored.y.
-     */
-    fun nudgedPosition(x: Int, y: Int, side: BubblePointerSide): Pair<Int, Int> {
-        val nudge = (painter.insetPx + SERVICE_GAP_DP * d - BODY_GAP_DP * d).coerceAtLeast(0f).toInt()
-        return when (side) {
-            BubblePointerSide.LEFT -> (x - nudge) to y
-            BubblePointerSide.RIGHT -> (x + nudge) to y
-            BubblePointerSide.TOP -> x to (y - nudge)
-            BubblePointerSide.BOTTOM -> x to (y + nudge)
-            BubblePointerSide.NONE -> x to y
-        }
-    }
-
-    // ───────────────────────── Contenido ─────────────────────────
 
     private fun isCritical() = percent <= 10
 

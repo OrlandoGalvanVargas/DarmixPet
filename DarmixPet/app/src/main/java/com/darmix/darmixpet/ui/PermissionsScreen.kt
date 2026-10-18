@@ -85,10 +85,11 @@ import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
 import kotlinx.coroutines.delay
+import com.darmix.darmixpet.notifications.NotificationAccessHelper
 
 
 
-private enum class PermKey { RESTRICTED, OVERLAY, USAGE, NOTIFICATIONS, BATTERY, ACCESSIBILITY, WRITE_SETTINGS }
+private enum class PermKey { RESTRICTED, OVERLAY, USAGE, NOTIFICATIONS, NOTIFICATION_ACCESS, BATTERY, ACCESSIBILITY, WRITE_SETTINGS }
 
 private data class PermItem(
     val key: PermKey,
@@ -139,19 +140,18 @@ private object PermissionIntents {
     )
 }
 
-private fun safeStart(context: Context, primary: Intent, fallback: Intent? = null) {
-    try {
-        context.startActivity(primary)
-    } catch (e: Exception) {
+private fun safeStart(context: Context, vararg intents: Intent?) {
+    for (intent in intents) {
+        if (intent == null) continue
         try {
-            if (fallback != null) context.startActivity(fallback)
-            else Toast.makeText(context, "No pude abrir los ajustes. Ábrelos manualmente.", Toast.LENGTH_LONG).show()
-        } catch (e2: Exception) {
-            Toast.makeText(context, "No pude abrir los ajustes. Ábrelos manualmente.", Toast.LENGTH_LONG).show()
+            context.startActivity(intent)
+            return
+        } catch (e: Exception) {
+            // Esta pantalla no existe en este teléfono: probamos la siguiente
         }
     }
+    Toast.makeText(context, "No pude abrir los ajustes. Ábrelos manualmente.", Toast.LENGTH_LONG).show()
 }
-
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
@@ -268,6 +268,32 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
             notes = emptyList(),
             primaryLabel = if (notifBlocked) "Abrir ajustes" else "Continuar"
         )
+        PermKey.NOTIFICATION_ACCESS -> PermGuide(
+            icon = DarmixIcons.Mail,
+            title = "Leer notificaciones",
+            intro = "Permite que Archi te muestre tus notificaciones con un toque, para leerlas, " +
+                    "abrirlas o eliminarlas sin bajar la barra.",
+            steps = listOf(
+                "Se abrirá «Acceso a notificaciones». Si ves una lista de apps, busca «DarmixPet» y tócalo.",
+                "Activa «Permitir acceso a notificaciones».",
+                "Android mostrará un aviso sobre lo que la app podrá leer. Toca «Permitir».",
+                "Vuelve a DarmixPet."
+            ),
+            notes = restrictedNote + listOf(
+                GuideNote(
+                    NoteKind.TIP,
+                    "DarmixPet solo lee tus notificaciones para mostrártelas en Archi. " +
+                            "No las guarda ni las envía a ningún lado."
+                ),
+                GuideNote(
+                    NoteKind.TIP,
+                    "¿Se abrió otra pantalla? Según la marca puede estar en «Acceso especial», " +
+                            "«Privacidad» o «Notificaciones → Configuración avanzada». También puedes " +
+                            "escribir «acceso a notificaciones» en el buscador de Ajustes."
+                )
+            ),
+            primaryLabel = "Abrir ajustes"
+        )
 
         PermKey.BATTERY -> PermGuide(
             icon = DarmixIcons.Battery,
@@ -336,6 +362,8 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     var hasAccessibility by remember { mutableStateOf(AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context)) }
     var hasWriteSettings by remember { mutableStateOf(BrightnessPermissionHelper.hasWriteSettingsPermission(context)) }
 
+    var hasNotificationAccess by remember { mutableStateOf(NotificationAccessHelper.isNotificationAccessGranted(context)) }
+
     var restrictedDone by remember { mutableStateOf(RestrictedStepPrefs.isDone(context)) }
     var restrictedOpened by rememberSaveable { mutableStateOf(false) }
     var notifBlocked by remember { mutableStateOf(false) }
@@ -344,11 +372,12 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     val fromStore = remember { isInstalledFromTrustedStore(context) }
     val restrictedPossible = Build.VERSION.SDK_INT >= 33 && !fromStore
 
-    val restrictedProven = hasAccessibility || (Build.VERSION.SDK_INT >= 35 && hasUsageStats)
+    val restrictedProven = hasAccessibility || hasNotificationAccess ||
+            (Build.VERSION.SDK_INT >= 35 && hasUsageStats)
     val restrictedGranted = restrictedDone || restrictedProven
-    val restrictedVisible = restrictedPossible && !(hasUsageStats && hasAccessibility)
+    val restrictedVisible = restrictedPossible &&
+            !(hasUsageStats && hasAccessibility && hasNotificationAccess)
     val restrictedNeeded = restrictedVisible && !restrictedGranted
-
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -367,6 +396,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                 hasBatteryExemption = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
                 hasAccessibility = AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context)
                 hasWriteSettings = BrightnessPermissionHelper.hasWriteSettingsPermission(context)
+                hasNotificationAccess = NotificationAccessHelper.isNotificationAccessGranted(context)
                 restrictedDone = RestrictedStepPrefs.isDone(context)
                 if (hasNotifications) notifBlocked = false
             }
@@ -375,8 +405,10 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(hasOverlay, hasUsageStats, hasNotifications, hasBatteryExemption, hasAccessibility, hasWriteSettings) {
-        if (hasOverlay && hasUsageStats && hasNotifications && hasBatteryExemption && hasAccessibility && hasWriteSettings) {
+    LaunchedEffect(hasOverlay, hasUsageStats, hasNotifications, hasNotificationAccess, hasBatteryExemption, hasAccessibility, hasWriteSettings) {
+        if (hasOverlay && hasUsageStats && hasNotifications && hasNotificationAccess &&
+            hasBatteryExemption && hasAccessibility && hasWriteSettings
+        ) {
             onAllGranted()
         }
     }
@@ -402,6 +434,9 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
             PermKey.NOTIFICATIONS ->
                 if (notifBlocked) safeStart(context, PermissionIntents.appNotifications(context))
                 else requestNotifications()
+            PermKey.NOTIFICATION_ACCESS -> safeStart(
+                context, *NotificationAccessHelper.buildPermissionIntents(context).toTypedArray()
+            )
             PermKey.BATTERY -> safeStart(context, BatteryOptimizationHelper.buildPermissionIntent(context))
             PermKey.ACCESSIBILITY -> safeStart(context, AccessibilityPermissionHelper.buildPermissionIntent())
             PermKey.WRITE_SETTINGS -> safeStart(context, BrightnessPermissionHelper.buildPermissionIntent(context))
@@ -431,6 +466,8 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         PermItem(PermKey.NOTIFICATIONS, DarmixIcons.Bell, "Notificaciones",
             "Para avisarte cuando una app entra en descanso.", hasNotifications,
             actionLabel = if (notifBlocked) "Abrir ajustes" else "Activar"),
+        PermItem(PermKey.NOTIFICATION_ACCESS, DarmixIcons.Mail, "Leer notificaciones",
+            "Para que Archi te muestre tus notificaciones con un toque.", hasNotificationAccess),
         PermItem(PermKey.BATTERY, DarmixIcons.Battery, "Ignorar optimización de batería",
             "Para que Archi no desaparezca por ahorro de batería.", hasBatteryExemption),
         PermItem(PermKey.ACCESSIBILITY, DarmixIcons.Eye, "Detección instantánea",

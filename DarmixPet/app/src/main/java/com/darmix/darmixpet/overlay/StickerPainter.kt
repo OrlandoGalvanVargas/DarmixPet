@@ -52,6 +52,7 @@ class StickerPainter(context: Context) {
             cachedStyle = null
         }
 
+    var tailAnchorPx: Float = -1f
 
     val tailReachPx: Float
         get() = (when (shapeStyle) {
@@ -98,6 +99,7 @@ class StickerPainter(context: Context) {
     private var cachedStyle: BubbleShapeStyle? = null
     private var cachedSide: BubblePointerSide? = null
     private var cachedScale = -1f
+    private var cachedAnchor = -1f
     private val circlePts = FloatArray(4)
     private var hasCircles = false
 
@@ -195,9 +197,10 @@ class StickerPainter(context: Context) {
 
     private fun ensurePaths(w: Float, h: Float, side: BubblePointerSide) {
         if (w == cachedW && h == cachedH && shapeStyle == cachedStyle &&
-            side == cachedSide && tailScale == cachedScale
+            side == cachedSide && tailScale == cachedScale && tailAnchorPx == cachedAnchor
         ) return
         cachedW = w; cachedH = h; cachedStyle = shapeStyle; cachedSide = side; cachedScale = tailScale
+        cachedAnchor = tailAnchorPx
 
         buildBody(w, h)
         outlinePath.set(bodyPath)
@@ -270,16 +273,26 @@ class StickerPainter(context: Context) {
 
 
     private fun setupTailMatrix(w: Float, h: Float, side: BubblePointerSide) {
-        val petCenter = 35f * d - insetPx
-        val ty = min(h / 2f, petCenter).coerceAtLeast(12f * d).coerceAtMost(max(12f * d, h - 12f * d))
+        val edge = 12f * d
+        val anchored = tailAnchorPx >= 0f
+        val ty = if (anchored) {
+            clampAlong(tailAnchorPx, h, edge)
+        } else {
+            val petCenter = 35f * d - insetPx
+            min(h / 2f, petCenter).coerceAtLeast(edge).coerceAtMost(max(edge, h - edge))
+        }
+        val tx = if (anchored) clampAlong(tailAnchorPx, w, edge) else w / 2f
         when (side) {
             BubblePointerSide.LEFT -> matrix.setTranslate(0f, ty)
             BubblePointerSide.RIGHT -> { matrix.setScale(-1f, 1f); matrix.postTranslate(w, ty) }
-            BubblePointerSide.TOP -> { matrix.setRotate(90f); matrix.postTranslate(w / 2f, 0f) }
-            BubblePointerSide.BOTTOM -> { matrix.setRotate(-90f); matrix.postTranslate(w / 2f, h) }
+            BubblePointerSide.TOP -> { matrix.setRotate(90f); matrix.postTranslate(tx, 0f) }
+            BubblePointerSide.BOTTOM -> { matrix.setRotate(-90f); matrix.postTranslate(tx, h) }
             BubblePointerSide.NONE -> matrix.reset()
         }
     }
+
+    private fun clampAlong(value: Float, length: Float, edge: Float): Float =
+        if (length > 2f * edge) value.coerceIn(edge, length - edge) else length / 2f
 
 
 

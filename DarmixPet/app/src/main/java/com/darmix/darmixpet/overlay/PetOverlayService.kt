@@ -48,9 +48,12 @@ import android.view.GestureDetector
 import com.darmix.darmixpet.monitor.ContextualStateChecker
 import com.darmix.darmixpet.MainActivity
 import com.darmix.darmixpet.mascota.CharacterPhrases
-
-
-private data class Anchored(val x: Int, val y: Int, val side: BubblePointerSide)
+import android.content.res.Configuration
+import android.graphics.Rect
+import com.darmix.darmixpet.notifications.NotificationAccessHelper
+import com.darmix.darmixpet.notifications.NotificationRepository
+import com.darmix.darmixpet.notifications.PetNotification
+import com.darmix.darmixpet.notifications.NotificationLauncher
 
 class PetOverlayService : LifecycleService() {
 
@@ -65,8 +68,8 @@ class PetOverlayService : LifecycleService() {
         private const val BLOCK_DEBOUNCE_MS = 2000L
         private const val BUBBLE_FADE_MS = 250L
         private const val BUBBLE_VISIBLE_MS = 1500L
-        private const val BUBBLE_GAP_DP = 4
-        private const val SCREEN_MARGIN_DP = 8
+        private const val TAIL_CLEARANCE_DP = 12
+        private const val ROTATION_SETTLE_MS = 300L
         private const val TIMER_APP_PACKAGE = "com.darmix.tiempomio"
         private const val STATUS_REFRESH_INTERVAL_MS = 1000L
         private const val TRIPLE_TAP_WINDOW_MS = 600L
@@ -91,10 +94,15 @@ class PetOverlayService : LifecycleService() {
 
     private lateinit var windowManager: WindowManager
     private var overlayView: OverlayPetView? = null
+    private var petAuraView: PetAuraView? = null
+    private lateinit var petAuraParams: WindowManager.LayoutParams
     private lateinit var layoutParams: WindowManager.LayoutParams
     private lateinit var ttsManager: TtsManager
     private lateinit var foregroundTracker: ForegroundAppTracker
     private var petSizePx = 0
+
+    private val overlayArea = Rect()
+    private val visibleFrame = Rect()
 
     private lateinit var flashlight: FlashlightController
     private var lastTorchToggleAt = 0L
@@ -119,6 +127,11 @@ class PetOverlayService : LifecycleService() {
     private var quickMenuView: QuickMenuView? = null
     private lateinit var quickMenuParams: WindowManager.LayoutParams
     private var quickMenuStatusJob: Job? = null
+    private var notificationPanelView: NotificationPanelView? = null
+    private lateinit var notificationPanelParams: WindowManager.LayoutParams
+    private var notificationPanelJob: Job? = null
+    private var currentNotificationKey: String? = null
+    private var currentNotificationIndex = 0
 
     private val tapTimestamps = mutableListOf<Long>()
     private var suppressTapCallbacksUntil = 0L
@@ -135,7 +148,7 @@ class PetOverlayService : LifecycleService() {
             val newSkinId = SkinPreferences.getSelectedSkinId(this)
             currentSkinInfo = SkinRegistry.byId(newSkinId)
             skin = ConfigurableSkin(currentSkinInfo)
-            val stateToShow = if (quickMenuView != null) MascotaAnimState.THINKING else currentBaseState
+            val stateToShow = if (isPanelOpen()) MascotaAnimState.THINKING else currentBaseState
             overlayView?.playSpriteSheet(skin.getAnimation(this, stateToShow), loop = true)
             applyThemeToViews()
         }
@@ -164,6 +177,7 @@ class PetOverlayService : LifecycleService() {
 
         currentBaseState = computeDesiredBaseState()
         flashlight = FlashlightController(this)
+        addAuraView()
         addOverlayView()
 
         ttsManager = TtsManager(this)
@@ -188,6 +202,8 @@ class PetOverlayService : LifecycleService() {
         startContextualStateLoop()
         startDailyResetWatcherLoop()
         startInstantGateListener()
+        NotificationAccessHelper.requestRebindIfNeeded(this)
+        startAuraListener()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -217,12 +233,17 @@ class PetOverlayService : LifecycleService() {
         overlayView?.stopAnimation()
         overlayView?.let { windowManager.removeView(it) }
         overlayView = null
+        petAuraView?.let { windowManager.removeView(it) }
+        petAuraView = null
         blockOverlayView?.let { windowManager.removeView(it) }
         blockOverlayView = null
         speechBubbleView?.let { windowManager.removeView(it) }
         speechBubbleView = null
         quickMenuView?.let { windowManager.removeView(it) }
         quickMenuView = null
+        notificationPanelJob?.cancel()
+        notificationPanelView?.let { windowManager.removeView(it) }
+        notificationPanelView = null
         batteryAlertView?.let { windowManager.removeView(it) }
         batteryAlertView = null
     }
@@ -232,6 +253,10 @@ class PetOverlayService : LifecycleService() {
         speechBubbleView?.setTheme(spec)
         batteryAlertView?.setTheme(spec)
         quickMenuView?.setTheme(spec)
+        notificationPanelView?.let {
+            it.setTheme(spec)
+            repositionNotificationPanel(it)
+        }
     }
 
 
@@ -241,6 +266,7 @@ class PetOverlayService : LifecycleService() {
             val dao = AppDatabase.getInstance(this@PetOverlayService).monitoredAppDao()
             ForegroundAppSignal.events.collect { packageName ->
                 if (quickMenuView != null) hideQuickMenu()
+                if (notificationPanelView != null) hideNotificationPanel()
                 lastForegroundPackage = packageName
                 instantGateCheck(dao, packageName)
             }
@@ -438,36 +464,65 @@ class PetOverlayService : LifecycleService() {
         return bubble
     }
 
-    private fun computeAnchoredPosition(elementWidth: Int, elementHeight: Int): Anchored {
-        val density = resources.displayMetrics.density
-        val gapPx = (BUBBLE_GAP_DP * density).toInt()
-        val marginPx = (SCREEN_MARGIN_DP * density).toInt()
-        val screenWidth = resources.displayMetrics.widthPixels
-        val screenHeight = resources.displayMetrics.heightPixels
-
-        val petLeft = layoutParams.x
-        val petRight = layoutParams.x + petSizePx
-        val petTop = layoutParams.y
-
-        val fitsOnRight = petRight + gapPx + elementWidth <= screenWidth - marginPx
-        val fitsOnLeft = petLeft - gapPx - elementWidth >= marginPx
-
-        return when {
-            fitsOnRight -> Anchored(petRight + gapPx, petTop, BubblePointerSide.LEFT)
-            fitsOnLeft -> Anchored(petLeft - gapPx - elementWidth, petTop, BubblePointerSide.RIGHT)
-            else -> {
-                val spaceAbove = petTop
-                val spaceBelow = screenHeight - (petTop + petSizePx)
-                val y = if (spaceAbove >= spaceBelow) {
-                    (petTop - gapPx - elementHeight).coerceAtLeast(marginPx)
-                } else {
-                    petTop + petSizePx + gapPx
-                }
-                val centeredX = petLeft + (petSizePx / 2) - (elementWidth / 2)
-                val side = if (spaceAbove >= spaceBelow) BubblePointerSide.BOTTOM else BubblePointerSide.TOP
-                Anchored(centeredX.coerceIn(marginPx, screenWidth - elementWidth - marginPx), y, side)
+    private fun refreshOverlayArea(): Rect {
+        val pet = overlayView
+        if (pet != null && pet.isAttachedToWindow) {
+            pet.getWindowVisibleDisplayFrame(visibleFrame)
+            if (!visibleFrame.isEmpty) {
+                overlayArea.set(0, 0, visibleFrame.width(), visibleFrame.height())
+                return overlayArea
             }
         }
+        val metrics = resources.displayMetrics
+        overlayArea.set(0, 0, metrics.widthPixels, metrics.heightPixels)
+        return overlayArea
+    }
+
+    private fun placeNearPet(
+        element: PetAnchoredElement,
+        width: Int,
+        height: Int,
+        refreshArea: Boolean = true
+    ): AnchorPlacement {
+        val area = if (refreshArea || overlayArea.isEmpty) refreshOverlayArea() else overlayArea
+        val placement = AnchorPlacer.place(
+            petX = layoutParams.x,
+            petY = layoutParams.y,
+            petSize = petSizePx,
+            area = area,
+            width = width,
+            height = height,
+            insetPx = element.anchorInsetPx,
+            gapPx = element.anchorGapPx,
+            tailClearancePx = TAIL_CLEARANCE_DP * resources.displayMetrics.density
+        )
+        element.applyAnchor(placement.side, placement.tailOffsetPx)
+        return placement
+    }
+
+    private fun clampPetPosition() {
+        if (overlayArea.isEmpty) return
+        val maxX = (overlayArea.right - petSizePx).coerceAtLeast(overlayArea.left)
+        val maxY = (overlayArea.bottom - petSizePx).coerceAtLeast(overlayArea.top)
+        layoutParams.x = layoutParams.x.coerceIn(overlayArea.left, maxX)
+        layoutParams.y = layoutParams.y.coerceIn(overlayArea.top, maxY)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        overlayView?.postDelayed({ realignAfterRotation() }, ROTATION_SETTLE_MS)
+    }
+
+    private fun realignAfterRotation() {
+        val pet = overlayView ?: return
+        refreshOverlayArea()
+        clampPetPosition()
+        windowManager.updateViewLayout(pet, layoutParams)
+        syncAuraPosition()
+        repositionBubbleIfVisible(refreshArea = false)
+        repositionBatteryAlertIfVisible(refreshArea = false)
+        quickMenuView?.let { repositionQuickMenu(it) }
+        notificationPanelView?.let { repositionNotificationPanel(it) }
     }
 
     private fun showSpeechBubble(text: String) {
@@ -477,10 +532,9 @@ class PetOverlayService : LifecycleService() {
         bubble.setMessage(text)
 
         bubble.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        val anchored = computeAnchoredPosition(bubble.measuredWidth, bubble.measuredHeight)
-        bubble.setPointerSide(anchored.side)
-        speechBubbleParams.x = anchored.x
-        speechBubbleParams.y = anchored.y
+        val placement = placeNearPet(bubble, bubble.measuredWidth, bubble.measuredHeight)
+        speechBubbleParams.x = placement.x
+        speechBubbleParams.y = placement.y
         windowManager.updateViewLayout(bubble, speechBubbleParams)
 
         bubble.popIn(BUBBLE_FADE_MS)
@@ -491,13 +545,12 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    private fun repositionBubbleIfVisible() {
+    private fun repositionBubbleIfVisible(refreshArea: Boolean = true) {
         val bubble = speechBubbleView ?: return
         if (bubble.alpha <= 0f) return
-        val anchored = computeAnchoredPosition(bubble.width, bubble.height)
-        bubble.setPointerSide(anchored.side)
-        speechBubbleParams.x = anchored.x
-        speechBubbleParams.y = anchored.y
+        val placement = placeNearPet(bubble, bubble.width, bubble.height, refreshArea)
+        speechBubbleParams.x = placement.x
+        speechBubbleParams.y = placement.y
         windowManager.updateViewLayout(bubble, speechBubbleParams)
     }
 
@@ -525,11 +578,9 @@ class PetOverlayService : LifecycleService() {
         view.setPercentText(ContextualStateChecker.batteryPercent(this))
 
         val (w, h) = view.measureSelf()
-        val anchored = computeAnchoredPosition(w, h)
-        view.setPointerSide(anchored.side)
-        val (nx, ny) = view.nudgedPosition(anchored.x, anchored.y, anchored.side)
-        batteryAlertParams.x = nx
-        batteryAlertParams.y = ny
+        val placement = placeNearPet(view, w, h)
+        batteryAlertParams.x = placement.x
+        batteryAlertParams.y = placement.y
         windowManager.updateViewLayout(view, batteryAlertParams)
 
         view.startBlink()
@@ -541,17 +592,13 @@ class PetOverlayService : LifecycleService() {
         view.setPercentText(ContextualStateChecker.batteryPercent(this))
     }
 
-    private fun repositionBatteryAlertIfVisible() {
+    private fun repositionBatteryAlertIfVisible(refreshArea: Boolean = true) {
         val view = batteryAlertView ?: return
         if (view.visibility != View.VISIBLE) return
         val (w, h) = view.measureSelf()
-        val anchored = computeAnchoredPosition(w, h)
-        view.setPointerSide(anchored.side)
-
-        val (nx, ny) = view.nudgedPosition(anchored.x, anchored.y, anchored.side)
-        batteryAlertParams.x = nx
-        batteryAlertParams.y = ny
-
+        val placement = placeNearPet(view, w, h, refreshArea)
+        batteryAlertParams.x = placement.x
+        batteryAlertParams.y = placement.y
         windowManager.updateViewLayout(view, batteryAlertParams)
     }
 
@@ -598,13 +645,13 @@ class PetOverlayService : LifecycleService() {
 
     private fun repositionQuickMenu(menu: QuickMenuView) {
         val (w, h) = menu.measureCard()
-        val anchored = computeAnchoredPosition(w, h)
-        menu.setPointerSide(anchored.side)
-        menu.positionCard(anchored.x, anchored.y)
+        val placement = placeNearPet(menu, w, h)
+        menu.positionCard(placement.x, placement.y)
     }
 
     private fun showQuickMenu() {
         val menu = ensureQuickMenu()
+        updateAura()
         menu.resetToFirstPage()
         menu.setTheme(currentSkinInfo.theme)
 
@@ -634,6 +681,113 @@ class PetOverlayService : LifecycleService() {
         quickMenuView?.let { windowManager.removeView(it) }
         quickMenuView = null
         overlayView?.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
+        updateAura()
+    }
+
+    private fun isPanelOpen(): Boolean = quickMenuView != null || notificationPanelView != null
+
+    private fun hideSpeechBubbleNow() {
+        bubbleJob?.cancel()
+        speechBubbleView?.let { if (it.alpha > 0f) it.popOut(BUBBLE_FADE_MS) }
+    }
+
+    private fun ensureNotificationPanel(): NotificationPanelView {
+        notificationPanelView?.let { return it }
+        val panel = NotificationPanelView(this).apply {
+            onClose = { hideNotificationPanel() }
+            onNext = { showNextNotification() }
+            onDismiss = { dismissCurrentNotification() }
+            onOpen = { openCurrentNotification() }
+        }
+        notificationPanelParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            0,
+            PixelFormat.TRANSLUCENT
+        )
+        windowManager.addView(panel, notificationPanelParams)
+        panel.requestFocus()
+        notificationPanelView = panel
+        return panel
+    }
+
+    private fun showNotificationPanel() {
+        val items = NotificationRepository.notifications.value
+        if (items.isEmpty()) return
+        hideSpeechBubbleNow()
+
+        currentNotificationIndex = 0
+        currentNotificationKey = items.first().key
+
+        val panel = ensureNotificationPanel()
+        updateAura()
+        panel.setTheme(currentSkinInfo.theme)
+        overlayView?.playSpriteSheet(skin.getAnimation(this, MascotaAnimState.THINKING), loop = true)
+        renderNotification(panel, items)
+
+        notificationPanelJob?.cancel()
+        notificationPanelJob = lifecycleScope.launch {
+            NotificationRepository.notifications.collect { list -> onNotificationsChanged(list) }
+        }
+    }
+
+    private fun onNotificationsChanged(list: List<PetNotification>) {
+        val panel = notificationPanelView ?: return
+        if (list.isEmpty()) {
+            hideNotificationPanel()
+            return
+        }
+        val keyIndex = list.indexOfFirst { it.key == currentNotificationKey }
+        if (keyIndex >= 0) {
+            currentNotificationIndex = keyIndex
+        } else if (currentNotificationIndex >= list.size) {
+            hideNotificationPanel()
+            return
+        }
+        renderNotification(panel, list)
+    }
+
+    private fun renderNotification(panel: NotificationPanelView, list: List<PetNotification>) {
+        val item = list[currentNotificationIndex]
+        currentNotificationKey = item.key
+        panel.bind(item, currentNotificationIndex, list.size, NotificationLauncher.canOpen(this, item))
+        repositionNotificationPanel(panel)
+    }
+
+    private fun repositionNotificationPanel(panel: NotificationPanelView) {
+        val (w, h) = panel.measureCard()
+        val placement = placeNearPet(panel, w, h)
+        panel.positionCard(placement.x, placement.y)
+    }
+
+    private fun showNextNotification() {
+        val panel = notificationPanelView ?: return
+        val list = NotificationRepository.notifications.value
+        val next = currentNotificationIndex + 1
+        if (next >= list.size) {
+            hideNotificationPanel()
+            return
+        }
+        currentNotificationIndex = next
+        renderNotification(panel, list)
+    }
+
+    private fun dismissCurrentNotification() {
+        val key = currentNotificationKey ?: return
+        if (!NotificationRepository.dismiss(key)) {
+            Toast.makeText(this, "No pude eliminar la notificación", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun hideNotificationPanel() {
+        notificationPanelJob?.cancel()
+        notificationPanelJob = null
+        currentNotificationKey = null
+        notificationPanelView?.let { windowManager.removeView(it) }
+        notificationPanelView = null
+        overlayView?.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
+        updateAura()
     }
 
     private fun refreshSkinMenuPage(menu: QuickMenuView) {
@@ -798,7 +952,7 @@ class PetOverlayService : LifecycleService() {
         val wasLowBattery = currentBaseState == MascotaAnimState.LOW_BATTERY
         currentBaseState = desiredState
 
-        if (quickMenuView == null) {
+        if (!isPanelOpen()) {
             overlayView?.playSpriteSheet(skin.getAnimation(this, desiredState), loop = true)
         }
 
@@ -809,7 +963,7 @@ class PetOverlayService : LifecycleService() {
             }
             desiredState == MascotaAnimState.NIGHT_WARNING && !nightWarningSpoken -> {
                 nightWarningSpoken = true
-                ttsManager.speak("Es muy tarde, ¿no deberías estar durmiendo?")
+                ttsManager.speak("Es muy tarde, deberías estar durmiendo")
             }
         }
 
@@ -820,7 +974,41 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
+    private fun addAuraView() {
+        val sizePx = (PET_SIZE_DP * resources.displayMetrics.density).toInt()
+        val aura = PetAuraView(this, sizePx).apply {
+            visibility = View.INVISIBLE
+        }
+        petAuraParams = WindowManager.LayoutParams(
+            aura.windowSizePx,
+            aura.windowSizePx,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        windowManager.addView(aura, petAuraParams)
+        petAuraView = aura
+    }
 
+    private fun syncAuraPosition() {
+        val aura = petAuraView ?: return
+        petAuraParams.x = layoutParams.x - aura.paddingPx
+        petAuraParams.y = layoutParams.y - aura.paddingPx
+        windowManager.updateViewLayout(aura, petAuraParams)
+    }
+
+    private fun updateAura() {
+        val active = NotificationRepository.notifications.value.isNotEmpty() && !isPanelOpen()
+        petAuraView?.setActive(active)
+    }
+
+    private fun startAuraListener() {
+        lifecycleScope.launch {
+            NotificationRepository.notifications.collect { updateAura() }
+        }
+    }
 
     private fun addOverlayView() {
         val sizePx = (PET_SIZE_DP * resources.displayMetrics.density).toInt()
@@ -838,11 +1026,13 @@ class PetOverlayService : LifecycleService() {
         }
 
         val petView = OverlayPetView(this)
+        petView.onFrameChanged = { frame -> petAuraView?.setFrame(frame) }
         petView.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
         petView.setOnTouchListener(createDragTouchListener(petView))
 
         windowManager.addView(petView, layoutParams)
         overlayView = petView
+        syncAuraPosition()
     }
 
     private fun createDragTouchListener(petView: OverlayPetView): View.OnTouchListener {
@@ -855,8 +1045,12 @@ class PetOverlayService : LifecycleService() {
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 if (System.currentTimeMillis() < suppressTapCallbacksUntil) return true
-                playReaction(petView, MascotaAnimState.TAP_SIMPLE)
-                showSpeechBubble(CharacterPhrases.random(currentSkinInfo.id))
+                if (NotificationRepository.notifications.value.isNotEmpty()) {
+                    showNotificationPanel()
+                } else {
+                    playReaction(petView, MascotaAnimState.TAP_SIMPLE)
+                    showSpeechBubble(CharacterPhrases.random(currentSkinInfo.id))
+                }
                 return true
             }
 
@@ -879,6 +1073,7 @@ class PetOverlayService : LifecycleService() {
                     initialY = layoutParams.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
+                    refreshOverlayArea()
 
                     val now = System.currentTimeMillis()
                     tapTimestamps.add(now)
@@ -894,9 +1089,11 @@ class PetOverlayService : LifecycleService() {
                 MotionEvent.ACTION_MOVE -> {
                     layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
                     layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
+                    clampPetPosition()
                     windowManager.updateViewLayout(view, layoutParams)
-                    repositionBubbleIfVisible()
-                    repositionBatteryAlertIfVisible()
+                    syncAuraPosition()
+                    repositionBubbleIfVisible(refreshArea = false)
+                    repositionBatteryAlertIfVisible(refreshArea = false)
                     true
                 }
                 else -> false
@@ -945,5 +1142,14 @@ class PetOverlayService : LifecycleService() {
             FlashlightController.Result.IN_USE -> "La cámara está en uso, no puedo encender la luz"
         }
         showSpeechBubble(message)
+    }
+
+    private fun openCurrentNotification() {
+        val key = currentNotificationKey ?: return
+        val item = NotificationRepository.notifications.value.firstOrNull { it.key == key } ?: return
+        hideNotificationPanel()
+        if (!NotificationLauncher.open(this, item)) {
+            Toast.makeText(this, "No pude abrir esta notificación", Toast.LENGTH_SHORT).show()
+        }
     }
 }

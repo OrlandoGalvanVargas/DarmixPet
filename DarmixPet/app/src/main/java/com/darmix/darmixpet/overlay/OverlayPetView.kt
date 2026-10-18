@@ -1,6 +1,7 @@
 package com.darmix.darmixpet.overlay
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.widget.ImageView
@@ -14,6 +15,8 @@ class OverlayPetView(context: Context) : ImageView(context) {
     private var loop = true
     private var onAnimationEnd: (() -> Unit)? = null
 
+    var onFrameChanged: ((Bitmap) -> Unit)? = null
+
     private val frameRunnable = object : Runnable {
         override fun run() {
             val sheet = spriteSheet ?: return
@@ -26,7 +29,7 @@ class OverlayPetView(context: Context) : ImageView(context) {
                     return
                 }
             }
-            setImageBitmap(sheet.frames[currentFrame])
+            showFrame(sheet.frames[currentFrame])
             handler.postDelayed(this, sheet.frameDurationMs)
         }
     }
@@ -37,11 +40,16 @@ class OverlayPetView(context: Context) : ImageView(context) {
         this.loop = loop
         this.onAnimationEnd = onEnd
         currentFrame = 0
-        setImageBitmap(sheet.frames[0])
+        showFrame(sheet.frames[0])
         handler.postDelayed(frameRunnable, sheet.frameDurationMs)
     }
 
     fun stopAnimation() {
         handler.removeCallbacks(frameRunnable)
+    }
+
+    private fun showFrame(bitmap: Bitmap) {
+        setImageBitmap(bitmap)
+        onFrameChanged?.invoke(bitmap)
     }
 }

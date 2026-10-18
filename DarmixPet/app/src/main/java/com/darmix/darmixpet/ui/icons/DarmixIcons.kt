@@ -31,6 +31,14 @@ object DarmixIcons {
         }
     }
 
+    val Mail: ImageVector by lazy {
+        icon("Mail") {
+            wash { rrect(3f, 5.5f, 18f, 13f, 2.5f) }
+            outline { rrect(3f, 5.5f, 18f, 13f, 2.5f) }
+            outline { moveTo(4f, 7f); lineTo(12f, 12.8f); lineTo(20f, 7f) }
+        }
+    }
+
     val Hourglass: ImageVector by lazy {
         icon("Hourglass") {
             wash {

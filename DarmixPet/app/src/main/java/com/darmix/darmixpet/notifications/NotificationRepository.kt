@@ -1,0 +1,39 @@
+package com.darmix.darmixpet.notifications
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import java.lang.ref.WeakReference
+
+object NotificationRepository {
+
+    private val _notifications = MutableStateFlow<List<PetNotification>>(emptyList())
+    val notifications: StateFlow<List<PetNotification>> = _notifications.asStateFlow()
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private var listenerRef: WeakReference<DarmixNotificationListener>? = null
+
+    internal fun onConnected(listener: DarmixNotificationListener) {
+        listenerRef = WeakReference(listener)
+        _isConnected.value = true
+    }
+
+    internal fun onDisconnected() {
+        listenerRef = null
+        _isConnected.value = false
+        _notifications.value = emptyList()
+    }
+
+    internal fun publish(list: List<PetNotification>) {
+        _notifications.value = list
+    }
+
+    fun dismiss(key: String): Boolean {
+        val listener = listenerRef?.get() ?: return false
+        _notifications.update { list -> list.filterNot { it.key == key } }
+        return listener.dismiss(key)
+    }
+}

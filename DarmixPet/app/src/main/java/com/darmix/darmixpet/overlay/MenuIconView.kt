@@ -13,8 +13,7 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-enum class MenuIcon { CLOCK, SUN, SPEAKER, HAT, GEAR, MOON, CHEVRON_LEFT, CHEVRON_RIGHT, CLOSE,LOCK, HOURGLASS  }
-
+enum class MenuIcon { CLOCK, SUN, SPEAKER, HAT, GEAR, MOON, CHEVRON_LEFT, CHEVRON_RIGHT, CLOSE, LOCK, HOURGLASS, BELL, TRASH }
 
 object MenuIcons {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -159,6 +158,44 @@ object MenuIcons {
                 path.cubicTo(16.5f, 9f, 14f, 10.5f, 12f, 12f)
                 path.cubicTo(14f, 13.5f, 16.5f, 15f, 16.5f, 17f)
                 path.lineTo(16.5f, 20.5f)
+                shape(canvas, false)
+            }
+
+            MenuIcon.BELL -> {
+                path.reset()
+                path.moveTo(12f, 3.5f)
+                path.cubicTo(8.7f, 3.5f, 7f, 6f, 7f, 9f)
+                path.lineTo(7f, 12.5f)
+                path.cubicTo(7f, 14.5f, 5.8f, 15.6f, 5f, 16.5f)
+                path.lineTo(19f, 16.5f)
+                path.cubicTo(18.2f, 15.6f, 17f, 14.5f, 17f, 12.5f)
+                path.lineTo(17f, 9f)
+                path.cubicTo(17f, 6f, 15.3f, 3.5f, 12f, 3.5f)
+                path.close()
+                shape(canvas, true)
+                path.reset()
+                path.moveTo(10f, 19.5f)
+                path.cubicTo(10.4f, 20.6f, 11.1f, 21f, 12f, 21f)
+                path.cubicTo(12.9f, 21f, 13.6f, 20.6f, 14f, 19.5f)
+                shape(canvas, false)
+            }
+            MenuIcon.TRASH -> {
+                path.reset()
+                path.moveTo(6.5f, 7.5f); path.lineTo(7.6f, 19f)
+                path.cubicTo(7.7f, 20f, 8.4f, 20.5f, 9.3f, 20.5f)
+                path.lineTo(14.7f, 20.5f)
+                path.cubicTo(15.6f, 20.5f, 16.3f, 20f, 16.4f, 19f)
+                path.lineTo(17.5f, 7.5f); path.close()
+                shape(canvas, true)
+                path.reset()
+                path.moveTo(4.5f, 7.5f); path.lineTo(19.5f, 7.5f)
+                path.moveTo(9.5f, 7.5f); path.lineTo(9.5f, 5f)
+                path.cubicTo(9.5f, 4.2f, 10f, 3.5f, 10.8f, 3.5f)
+                path.lineTo(13.2f, 3.5f)
+                path.cubicTo(14f, 3.5f, 14.5f, 4.2f, 14.5f, 5f)
+                path.lineTo(14.5f, 7.5f)
+                path.moveTo(10.5f, 11f); path.lineTo(10.7f, 17f)
+                path.moveTo(13.5f, 11f); path.lineTo(13.3f, 17f)
                 shape(canvas, false)
             }
 
