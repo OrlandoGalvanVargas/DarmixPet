@@ -22,6 +22,13 @@ y te recuerda que la vida también pasa fuera de la pantalla.
 [![Room](https://img.shields.io/badge/Room-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
 [![Versión](https://img.shields.io/badge/Versión-1.0-E8B84A?style=for-the-badge)](#)
 [![Licencia](https://img.shields.io/badge/Licencia-Privada-C96262?style=for-the-badge)](#-licencia)
+[![Sitio oficial](https://img.shields.io/badge/Sitio_oficial-darmixista.dev-211D28?style=for-the-badge&logo=googlechrome&logoColor=white)](https://darmixista.dev/darmixpet/)
+
+<br />
+
+### 🌐 [Visita la página oficial de DarmixPet](https://darmixista.dev/darmixpet/)
+
+<sub>También disponible en [English](https://darmixista.dev/en/darmixpet/)</sub>
 
 <br />
 
@@ -29,7 +36,8 @@ y te recuerda que la vida también pasa fuera de la pantalla.
 [🎭 Compañeros](#-tus-compañeros) ·
 [🔐 Permisos](#-permisos-paso-a-paso) ·
 [🚀 Instalación](#-instalación) ·
-[🔒 Privacidad](#-privacidad)
+[🔒 Privacidad](#-privacidad) ·
+[🌐 Sitio oficial](https://darmixista.dev/darmixpet/)
 
 </div>
 
@@ -182,11 +190,15 @@ contigo.
 
 ### Pasos
 
-1. Descarga el **APK** desde la [última release](../../releases/latest).
+1. Descarga el **APK** desde la [página oficial](https://darmixista.dev/darmixpet/) o desde la [última release](../../releases/latest).
 2. Ábrelo desde tu gestor de archivos.
 3. Si Android lo pide, **autoriza la instalación desde esta fuente**.
 4. Abre DarmixPet y **completa la pantalla de permisos** (abajo te explicamos cada uno).
 5. Elige a tu compañero y empieza a cuidar tu tiempo.
+
+> [!TIP]
+> Si estás en la computadora, abre la [página oficial](https://darmixista.dev/darmixpet/)
+> y escanea el código QR con tu teléfono Android para descargarlo ahí directamente.
 
 > [!IMPORTANT]
 > DarmixPet **no está en Google Play**. Se distribuye como APK directo
@@ -461,7 +473,7 @@ Consulta el [**CHANGELOG.md**](CHANGELOG.md) para ver el registro completo de ca
 **Hecho con 💜 por Darmix**
 
 <sub>Si DarmixPet te ayuda a usar mejor tu tiempo, compártelo con quien lo necesite.</sub>
-<sub>[Changelog](CHANGELOG.md) · [Releases](../../releases) · [Reportar un bug](../../issues)</sub><br /><br />
+<sub>[Sitio oficial](https://darmixista.dev/darmixpet/) · [Changelog](CHANGELOG.md) · [Releases](../../releases) · [Reportar un bug](../../issues)</sub><br /><br />
 
 <img src="docs/characters/archi.png" width="60" />
 <img src="docs/characters/sylva.png" width="60" />
