@@ -392,6 +392,22 @@ object DarmixIcons {
         }
     }
 
+    val SpeakerOff: ImageVector by lazy {
+        icon("SpeakerOff") {
+            val body: PathBuilder.() -> Unit = {
+                moveTo(4f, 9.5f); lineTo(8f, 9.5f); lineTo(13f, 5.5f)
+                lineTo(13f, 18.5f); lineTo(8f, 14.5f); lineTo(4f, 14.5f)
+                close()
+            }
+            wash(body)
+            outline(block = body)
+            outline(width = 2.2f) {
+                moveTo(16.5f, 9.5f); lineTo(21.5f, 14.5f)
+                moveTo(21.5f, 9.5f); lineTo(16.5f, 14.5f)
+            }
+        }
+    }
+
     val Flashlight: ImageVector by lazy {
         icon("Flashlight") {
             val head: PathBuilder.() -> Unit = {

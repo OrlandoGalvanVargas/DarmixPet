@@ -42,7 +42,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -96,11 +95,7 @@ fun SettingsScreen(
     val scheme = MaterialTheme.colorScheme
     var showGuide by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
     val updateOffer by UpdateManager.offer.collectAsState()
-    val checkState by UpdateManager.checkState.collectAsState()
-    var showUpdateStatus by remember { mutableStateOf(false) }
-    LaunchedEffect(updateOffer) { if (updateOffer != null) showUpdateStatus = false }
 
     Column(
         modifier = modifier
@@ -114,7 +109,11 @@ fun SettingsScreen(
                 .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)
+            ) {
                 Text(
                     "Ajustes",
                     style = MaterialTheme.typography.headlineMedium,
@@ -126,25 +125,14 @@ fun SettingsScreen(
                     color = scheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            UpdateStatusChip(
-                offer = updateOffer,
-                checkState = checkState,
-                onClick = {
-                    if (updateOffer != null) {
-                        UpdateManager.requestDialog()
-                    } else {
-                        UpdateManager.checkNow(context)
-                        showUpdateStatus = true
-                    }
-                }
-            )
         }
 
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
             Text("Tu mascota", style = MaterialTheme.typography.titleMedium, color = scheme.onBackground)
         }
         PetPowerCard(modifier = Modifier.padding(start = 20.dp, end = 24.dp))
+        Spacer(Modifier.height(14.dp))
+        VoiceCard(modifier = Modifier.padding(start = 20.dp, end = 24.dp))
 
         Spacer(Modifier.height(28.dp))
 
@@ -211,14 +199,6 @@ fun SettingsScreen(
 
     if (showGuide) GuideDialog(onDismiss = { showGuide = false })
 
-    if (showUpdateStatus && updateOffer == null) {
-        UpdateStatusDialog(
-            state = checkState,
-            installedVersion = BuildConfig.VERSION_NAME,
-            onRetry = { UpdateManager.checkNow(context) },
-            onDismiss = { showUpdateStatus = false }
-        )
-    }
 }
 
 

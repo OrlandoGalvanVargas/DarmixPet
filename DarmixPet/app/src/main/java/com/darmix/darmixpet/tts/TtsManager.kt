@@ -1,20 +1,32 @@
 package com.darmix.darmixpet.tts
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import java.util.Locale
 
 class TtsManager(context: Context) {
 
+    private val appContext = context.applicationContext
     private var isReady = false
 
-    private val tts: TextToSpeech = TextToSpeech(context) { status ->
+    private val tts: TextToSpeech = TextToSpeech(appContext) { status ->
         if (status == TextToSpeech.SUCCESS) {
             onEngineReady()
         } else {
             Log.w("TtsManager", "Falló la inicialización del motor TTS (status=$status)")
         }
+    }
+
+    private val voiceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == VoicePreferences.KEY_VOICE_ENABLED && !VoicePreferences.isEnabled(appContext)) {
+            tts.stop()
+        }
+    }
+
+    init {
+        VoicePreferences.registerListener(appContext, voiceListener)
     }
 
     private fun onEngineReady() {
@@ -27,11 +39,12 @@ class TtsManager(context: Context) {
     }
 
     fun speak(text: String) {
-        if (!isReady) return
+        if (!isReady || !VoicePreferences.isEnabled(appContext)) return
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
     fun shutdown() {
+        VoicePreferences.unregisterListener(appContext, voiceListener)
         tts.stop()
         tts.shutdown()
     }
