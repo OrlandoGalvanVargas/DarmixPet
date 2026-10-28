@@ -54,6 +54,7 @@ import com.darmix.darmixpet.notifications.NotificationAccessHelper
 import com.darmix.darmixpet.notifications.NotificationRepository
 import com.darmix.darmixpet.notifications.PetNotification
 import com.darmix.darmixpet.notifications.NotificationLauncher
+import com.darmix.darmixpet.notifications.NotificationListenerGuard
 
 class PetOverlayService : LifecycleService() {
 
@@ -133,6 +134,8 @@ class PetOverlayService : LifecycleService() {
     private var currentNotificationKey: String? = null
     private var currentNotificationIndex = 0
 
+    private val notificationGuard by lazy { NotificationListenerGuard(this, lifecycleScope) }
+
     private val tapTimestamps = mutableListOf<Long>()
     private var suppressTapCallbacksUntil = 0L
 
@@ -160,8 +163,13 @@ class PetOverlayService : LifecycleService() {
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenOn = true
                     updateContextualBaseState()
+                    updateAura()
+                    notificationGuard.check()
                 }
-                Intent.ACTION_SCREEN_OFF -> isScreenOn = false
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenOn = false
+                    updateAura()
+                }
             }
         }
     }
@@ -202,7 +210,7 @@ class PetOverlayService : LifecycleService() {
         startContextualStateLoop()
         startDailyResetWatcherLoop()
         startInstantGateListener()
-        NotificationAccessHelper.requestRebindIfNeeded(this)
+        notificationGuard.start()
         startAuraListener()
     }
 
@@ -229,6 +237,7 @@ class PetOverlayService : LifecycleService() {
         bubbleJob?.cancel()
         quickMenuStatusJob?.cancel()
         batteryAlertReappearJob?.cancel()
+        notificationGuard.stop()
         ttsManager.shutdown()
         overlayView?.stopAnimation()
         overlayView?.let { windowManager.removeView(it) }
@@ -1000,7 +1009,9 @@ class PetOverlayService : LifecycleService() {
     }
 
     private fun updateAura() {
-        val active = NotificationRepository.notifications.value.isNotEmpty() && !isPanelOpen()
+        val active = isScreenOn &&
+                NotificationRepository.notifications.value.isNotEmpty() &&
+                !isPanelOpen()
         petAuraView?.setActive(active)
     }
 
@@ -1045,6 +1056,7 @@ class PetOverlayService : LifecycleService() {
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 if (System.currentTimeMillis() < suppressTapCallbacksUntil) return true
+                if (!NotificationRepository.refreshNow()) notificationGuard.check()
                 if (NotificationRepository.notifications.value.isNotEmpty()) {
                     showNotificationPanel()
                 } else {

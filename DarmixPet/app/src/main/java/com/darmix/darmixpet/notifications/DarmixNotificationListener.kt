@@ -1,6 +1,5 @@
 package com.darmix.darmixpet.notifications
 
-import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -36,14 +35,7 @@ class DarmixNotificationListener : NotificationListenerService() {
         Log.d(TAG, "Listener desconectado")
         syncJob?.cancel()
         NotificationRepository.onDisconnected()
-
-        if (NotificationAccessHelper.isNotificationAccessGranted(this)) {
-            try {
-                requestRebind(ComponentName(this, DarmixNotificationListener::class.java))
-            } catch (e: Exception) {
-                Log.w(TAG, "No se pudo solicitar rebind", e)
-            }
-        }
+        NotificationAccessHelper.requestRebind(this)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) = requestSync()
@@ -57,6 +49,14 @@ class DarmixNotificationListener : NotificationListenerService() {
         NotificationRepository.onDisconnected()
         super.onDestroy()
     }
+
+    internal fun isResponsive(): Boolean = try {
+        activeNotifications != null
+    } catch (e: Exception) {
+        false
+    }
+
+    internal fun syncNow() = sync()
 
     internal fun dismiss(key: String): Boolean = try {
         val active = activeNotifications ?: emptyArray()
@@ -86,6 +86,7 @@ class DarmixNotificationListener : NotificationListenerService() {
         }
     }
 
+    @Synchronized
     private fun sync() {
         val active = try {
             activeNotifications ?: emptyArray()

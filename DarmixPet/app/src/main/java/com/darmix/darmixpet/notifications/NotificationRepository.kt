@@ -36,4 +36,12 @@ object NotificationRepository {
         _notifications.update { list -> list.filterNot { it.key == key } }
         return listener.dismiss(key)
     }
+
+    fun isHealthy(): Boolean = listenerRef?.get()?.isResponsive() == true
+
+    fun refreshNow(): Boolean {
+        val listener = listenerRef?.get() ?: return false
+        listener.syncNow()
+        return true
+    }
 }
