@@ -231,7 +231,7 @@ fun GuideDialog(onDismiss: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
-            GuideDots(count = steps.size, current = page, accent = accent)
+            GuideDots(count = steps.size, current = page, accent = scheme.primary)
 
             Spacer(Modifier.height(10.dp))
 
@@ -380,7 +380,6 @@ private fun GuideScene(
     phrase: String
 ) {
     val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
     val ink = Color(skin.theme.secondaryColor)
     val stageFill = accent.copy(alpha = 0.20f).compositeOver(scheme.surface)
 
@@ -440,7 +439,7 @@ private fun GuideScene(
     ) {
 
         Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp)) {
-            StatusBadge(chip, DarmixIcons.Sparkle, colors.gold, colors.onGold)
+            StatusBadge(chip, DarmixIcons.Sparkle, scheme.primary, scheme.onPrimary)
         }
 
 
@@ -478,13 +477,13 @@ private fun GuideScene(
                 GestureKind.TAP2 -> {
                     tapEffect(t, 0.15f, center, ring, ink)
                     tapEffect(t, 0.30f, center, ring, ink)
-                    sparkleBurst(t, 0.36f, 0.26f, center, colors.gold, accent, 34f, 0.7f)
+                    sparkleBurst(t, 0.36f, 0.26f, center, scheme.primary, accent, 34f, 0.7f)
                 }
                 GestureKind.TAP3 -> {
                     tapEffect(t, 0.10f, center, ring, ink)
                     tapEffect(t, 0.22f, center, ring, ink)
                     tapEffect(t, 0.34f, center, ring, ink)
-                    sparkleBurst(t, 0.40f, 0.34f, center, colors.gold, accent, 52f, 1f)
+                    sparkleBurst(t, 0.40f, 0.34f, center, scheme.primary, accent, 52f, 1f)
                 }
                 GestureKind.HOLD -> {
                     if (t in 0.10f..0.56f) {

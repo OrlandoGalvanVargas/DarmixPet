@@ -741,14 +741,14 @@ private fun ProgressCard(done: Int, total: Int) {
             Row(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(colors.goldContainer)
+                    .background(colors.accentContainer)
                     .border(2.dp, colors.ink, CircleShape)
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(DarmixIcons.Sparkle, null, tint = colors.onGoldContainer, modifier = Modifier.size(16.dp))
+                Icon(DarmixIcons.Sparkle, null, tint = colors.onAccentContainer, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("$done/$total", style = MaterialTheme.typography.labelLarge, color = colors.onGoldContainer)
+                Text("$done/$total", style = MaterialTheme.typography.labelLarge, color = colors.onAccentContainer)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -762,7 +762,7 @@ private fun ProgressCard(done: Int, total: Int) {
 private fun Gem(filled: Boolean, modifier: Modifier = Modifier) {
     val colors = DarmixTheme.colors
     val fill by animateColorAsState(
-        targetValue = if (filled) colors.gold else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = if (filled) colors.accent else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(350),
         label = "gemFill"
     )
@@ -797,7 +797,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
         label = "cardDepth"
     )
-    val pendingFill = if (item.key == PermKey.RESTRICTED) colors.goldContainer else scheme.surface
+    val pendingFill = if (item.key == PermKey.RESTRICTED) colors.accentContainer else scheme.surface
     val fill by animateColorAsState(
         targetValue = if (item.granted) scheme.tertiaryContainer else pendingFill,
         animationSpec = tween(300),
@@ -805,21 +805,21 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
     )
 
     val bubbleTarget = if (item.granted) scheme.tertiary else when {
-        item.key == PermKey.RESTRICTED -> colors.gold
+        item.key == PermKey.RESTRICTED -> colors.accent
         index % 3 == 0 -> scheme.primaryContainer
         index % 3 == 1 -> scheme.secondaryContainer
-        else -> colors.goldContainer
+        else -> colors.accentContainer
     }
     val glyphTarget = if (item.granted) scheme.onTertiary else when {
-        item.key == PermKey.RESTRICTED -> colors.onGold
+        item.key == PermKey.RESTRICTED -> colors.onAccent
         index % 3 == 0 -> scheme.onPrimaryContainer
         index % 3 == 1 -> scheme.onSecondaryContainer
-        else -> colors.onGoldContainer
+        else -> colors.onAccentContainer
     }
     val bubble by animateColorAsState(bubbleTarget, tween(300), label = "bubble")
     val glyph by animateColorAsState(glyphTarget, tween(300), label = "glyph")
     val onFill = if (item.granted) scheme.onTertiaryContainer
-    else if (item.key == PermKey.RESTRICTED) colors.onGoldContainer else scheme.onSurface
+    else if (item.key == PermKey.RESTRICTED) colors.onAccentContainer else scheme.onSurface
 
     Column(
         modifier = Modifier
@@ -833,7 +833,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
             .padding(14.dp)
     ) {
         if (item.badge != null && !item.granted) {
-            StatusBadge(item.badge, DarmixIcons.Sparkle, colors.gold, colors.onGold)
+            StatusBadge(item.badge, DarmixIcons.Sparkle, colors.accent, colors.onAccent)
             Spacer(Modifier.height(10.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {

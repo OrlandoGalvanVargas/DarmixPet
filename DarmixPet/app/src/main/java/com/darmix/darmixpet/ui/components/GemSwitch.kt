@@ -57,12 +57,12 @@ fun GemSwitch(
         label = "gemX"
     )
     val track by animateColorAsState(
-        targetValue = if (checked) scheme.tertiary else scheme.surfaceVariant,
+        targetValue = if (checked) scheme.primary else scheme.surfaceVariant,
         animationSpec = tween(250),
         label = "gemTrack"
     )
     val thumb by animateColorAsState(
-        targetValue = if (checked) colors.gold else scheme.surface,
+        targetValue = scheme.surface,
         animationSpec = tween(250),
         label = "gemThumb"
     )
@@ -104,7 +104,7 @@ fun GemSwitch(
                 ) {
                     Icon(
                         DarmixIcons.Check, contentDescription = null,
-                        tint = colors.onGold, modifier = Modifier.size(14.dp)
+                        tint = scheme.onPrimaryContainer, modifier = Modifier.size(14.dp)
                     )
                 }
             }

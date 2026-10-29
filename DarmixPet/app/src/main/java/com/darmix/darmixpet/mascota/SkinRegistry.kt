@@ -52,11 +52,11 @@ object SkinRegistry {
             displayName = "Sir Galahad el Guardián",
             subtitle = "Tierra · Disciplina",
             description = "Valiente, firme y leal. Defiende tus límites cuando se agota tu tiempo.",
-            accentColor = 0xFF0D9488,
+            accentColor = 0xFFD8B67E,
             theme = MascotThemeSpec(
-                primaryColor = 0xFF9A3412,
-                secondaryColor = 0xFF334155,
-                accentColor = 0xFF9F1239,
+                primaryColor = 0xFFD8B67E,
+                secondaryColor = 0xFF3A3631,
+                accentColor = 0xFF9C6B47,
                 shapeStyle = BubbleShapeStyle.ANGULAR_SHIELD
             ),
             idleRes = R.drawable.skin3_idle,

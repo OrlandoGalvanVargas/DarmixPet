@@ -85,6 +85,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
 private enum class AppFilter { ALL, WATCHED }
 
@@ -119,6 +120,9 @@ fun AppListScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { AppDatabase.getInstance(context).monitoredAppDao() }
+
+    val skinId by rememberSelectedSkinId()
+    val petName = SkinLore.forId(skinId).shortName
 
     var installedApps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -157,7 +161,7 @@ fun AppListScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ListHeader(watched = monitoredApps.size)
+        ListHeader(watched = monitoredApps.size, petName = petName)
 
         PetSleepBanner()
 
@@ -178,7 +182,7 @@ fun AppListScreen(modifier: Modifier = Modifier) {
         Box(modifier = Modifier.weight(1f)) {
             when {
                 isLoading -> CenteredMessage(
-                    title = "Archi está buscando tus apps…",
+                    title = "$petName está buscando tus apps…",
                     body = "Un momentito"
                 )
 
@@ -186,7 +190,7 @@ fun AppListScreen(modifier: Modifier = Modifier) {
                     val (title, body) = when {
                         query.isNotBlank() -> "No encontré esa app" to "Prueba con otro nombre"
                         filter == AppFilter.WATCHED ->
-                            "Aún no vigilas ninguna app" to "Activa el interruptor de una app para que Archi la cuide"
+                            "Aún no vigilas ninguna app" to "Activa el interruptor de una app para que $petName la cuide"
                         else -> "No hay apps para mostrar" to "Vuelve a intentarlo en un momento"
                     }
                     CenteredMessage(title, body)
@@ -265,10 +269,8 @@ fun AppListScreen(modifier: Modifier = Modifier) {
     }
 }
 
-
-
 @Composable
-private fun ListHeader(watched: Int) {
+private fun ListHeader(watched: Int, petName: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -283,7 +285,7 @@ private fun ListHeader(watched: Int) {
             )
             Text(
                 if (watched == 0) "Ninguna app vigilada todavía"
-                else "$watched app${if (watched == 1) "" else "s"} bajo vigilancia de Archi",
+                else "$watched app${if (watched == 1) "" else "s"} bajo vigilancia de $petName",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -295,6 +297,7 @@ private fun ListHeader(watched: Int) {
 
 @Composable
 private fun WatchBadge(count: Int) {
+    val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val pop = remember { Animatable(1f) }
     LaunchedEffect(count) {
@@ -304,14 +307,14 @@ private fun WatchBadge(count: Int) {
     Row(
         modifier = Modifier
             .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
-            .sticker(shape = CircleShape, fill = colors.goldContainer, depth = 3.dp)
+            .sticker(shape = CircleShape, fill = scheme.primaryContainer, depth = 3.dp)
             .padding(horizontal = 14.dp, vertical = 8.dp)
             .semantics { contentDescription = "$count apps vigiladas" },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(DarmixIcons.Eye, null, tint = colors.onGoldContainer, modifier = Modifier.size(20.dp))
+        Icon(DarmixIcons.Eye, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(6.dp))
-        Text("$count", style = MaterialTheme.typography.titleSmall, color = colors.onGoldContainer)
+        Text("$count", style = MaterialTheme.typography.titleSmall, color = scheme.onPrimaryContainer)
     }
 }
 
@@ -473,7 +476,7 @@ private fun AppRow(
         targetValue = when (status) {
             AppStatus.IDLE -> scheme.surface.copy(alpha = 0.55f)
             AppStatus.AVAILABLE -> scheme.surface
-            AppStatus.IN_SESSION -> colors.goldContainer
+            AppStatus.IN_SESSION -> scheme.primaryContainer
             AppStatus.NO_USES -> colors.blockedContainer
             AppStatus.COOLDOWN -> colors.cooldownContainer
         },
@@ -527,28 +530,30 @@ private fun AppRow(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     StatChip(
                         DarmixIcons.Clock, "${monitored.sessionLimitMinutes}m",
-                        scheme.primaryContainer, scheme.onPrimaryContainer
+                        iconTint = scheme.onSurfaceVariant
                     )
                     StatChip(
                         DarmixIcons.Snowflake, "${monitored.cooldownMinutes}m",
-                        scheme.secondaryContainer, scheme.onSecondaryContainer
+                        iconTint = scheme.onSurfaceVariant
                     )
                     if (status == AppStatus.NO_USES) {
                         StatChip(
                             DarmixIcons.Ticket, "${monitored.sessionsUsedToday}/${monitored.maxSessionsPerDay}",
-                            colors.blocked, scheme.onError
+                            iconTint = scheme.onError,
+                            container = colors.blocked,
+                            content = scheme.onError
                         )
                     } else {
                         StatChip(
                             DarmixIcons.Ticket, "${monitored.sessionsUsedToday}/${monitored.maxSessionsPerDay}",
-                            scheme.tertiaryContainer, scheme.onTertiaryContainer
+                            iconTint = scheme.onSurfaceVariant
                         )
                     }
                 }
                 when (status) {
                     AppStatus.IN_SESSION -> {
                         Spacer(Modifier.height(6.dp))
-                        StatusBadge("En sesión", DarmixIcons.Lock, colors.gold, colors.onGold)
+                        StatusBadge("En sesión", DarmixIcons.Lock, colors.accent, colors.onAccent)
                     }
                     AppStatus.NO_USES -> {
                         Spacer(Modifier.height(6.dp))
@@ -604,7 +609,13 @@ private fun AppIconTile(app: InstalledAppInfo, isActive: Boolean) {
 }
 
 @Composable
-private fun StatChip(icon: ImageVector, text: String, container: Color, content: Color) {
+private fun StatChip(
+    icon: ImageVector,
+    text: String,
+    iconTint: Color,
+    container: Color = MaterialTheme.colorScheme.surfaceVariant,
+    content: Color = MaterialTheme.colorScheme.onSurface
+) {
     Row(
         modifier = Modifier
             .clip(CircleShape)
@@ -612,7 +623,7 @@ private fun StatChip(icon: ImageVector, text: String, container: Color, content:
             .padding(start = 6.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(13.dp))
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(3.dp))
         Text(text, style = MaterialTheme.typography.labelSmall, color = content)
     }

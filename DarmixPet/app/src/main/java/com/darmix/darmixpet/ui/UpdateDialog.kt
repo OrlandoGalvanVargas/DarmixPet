@@ -140,8 +140,8 @@ fun UpdateDialog(
             StatusBadge(
                 text = "v$currentVersion  →  v$latestVersion",
                 icon = DarmixIcons.Sparkle,
-                container = colors.gold,
-                content = colors.onGold
+                container = colors.accent,
+                content = colors.onAccent
             )
 
             Spacer(Modifier.height(14.dp))

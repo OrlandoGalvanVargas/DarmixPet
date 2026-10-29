@@ -75,11 +75,8 @@ private fun NavItem(screen: AppScreen, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
 
-    val (bubble, onBubble) = when (screen) {
-        AppScreen.APPS -> scheme.primaryContainer to scheme.onPrimaryContainer
-        AppScreen.MASCOT -> scheme.secondaryContainer to scheme.onSecondaryContainer
-        AppScreen.SETTINGS -> colors.goldContainer to colors.onGoldContainer
-    }
+    val bubble = scheme.primaryContainer
+    val onBubble = scheme.onPrimaryContainer
 
     val fill by animateColorAsState(if (selected) bubble else Color.Transparent, tween(250), label = "navFill")
     val edge by animateColorAsState(if (selected) colors.ink else Color.Transparent, tween(250), label = "navEdge")

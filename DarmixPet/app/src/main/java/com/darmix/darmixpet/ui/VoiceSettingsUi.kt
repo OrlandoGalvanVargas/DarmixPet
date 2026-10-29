@@ -57,10 +57,11 @@ fun VoiceCard(modifier: Modifier = Modifier) {
     val enabled by rememberVoiceEnabled()
 
     val fill by animateColorAsState(
-        targetValue = if (enabled) scheme.surface else scheme.surfaceVariant,
+        targetValue = if (enabled) scheme.primaryContainer else scheme.surfaceVariant,
         animationSpec = tween(300),
         label = "voiceCardFill"
     )
+    val onFill = if (enabled) scheme.onPrimaryContainer else scheme.onSurface
     val bubbleFill by animateColorAsState(
         targetValue = if (enabled) scheme.primaryContainer else scheme.surface,
         animationSpec = tween(300),
@@ -93,19 +94,19 @@ fun VoiceCard(modifier: Modifier = Modifier) {
             Text(
                 "Voz de la mascota",
                 style = MaterialTheme.typography.titleSmall,
-                color = scheme.onSurface
+                color = onFill
             )
             Text(
                 if (enabled) "Te avisa en voz alta de la batería baja, la noche y tus límites de tiempo"
                 else "Seguirá avisándote con animaciones y mensajes, pero sin hablar",
                 style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurface.copy(alpha = 0.85f)
+                color = onFill.copy(alpha = 0.85f)
             )
             Spacer(Modifier.height(6.dp))
             if (enabled) {
-                StatusBadge("Con voz", DarmixIcons.Speaker, colors.available, scheme.onTertiary)
+                StatusBadge("Con voz", DarmixIcons.Speaker, scheme.primary, scheme.onPrimary)
             } else {
-                StatusBadge("Silenciada", DarmixIcons.SpeakerOff, colors.cooldown, scheme.onSecondary)
+                StatusBadge("Silenciada", DarmixIcons.SpeakerOff, scheme.onSurfaceVariant, scheme.surface)
             }
         }
         Spacer(Modifier.width(8.dp))

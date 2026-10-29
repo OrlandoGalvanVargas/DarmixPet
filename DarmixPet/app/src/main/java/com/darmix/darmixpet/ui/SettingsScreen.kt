@@ -72,17 +72,11 @@ import com.darmix.darmixpet.ui.components.HatBadge
 import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
-import com.darmix.darmixpet.ui.theme.DarkBackground
-import com.darmix.darmixpet.ui.theme.DarkDarmixColors
-import com.darmix.darmixpet.ui.theme.DarkOnSurface
-import com.darmix.darmixpet.ui.theme.DarkPrimary
-import com.darmix.darmixpet.ui.theme.DarkSurface
+
 import com.darmix.darmixpet.ui.theme.DarmixTheme
-import com.darmix.darmixpet.ui.theme.LightBackground
-import com.darmix.darmixpet.ui.theme.LightDarmixColors
-import com.darmix.darmixpet.ui.theme.LightOnSurface
-import com.darmix.darmixpet.ui.theme.LightPrimary
-import com.darmix.darmixpet.ui.theme.LightSurface
+import com.darmix.darmixpet.ui.theme.AppPalettes
+import com.darmix.darmixpet.ui.theme.ThemePalette
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 import com.darmix.darmixpet.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 
@@ -103,28 +97,21 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)
-            ) {
-                Text(
-                    "Ajustes",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = scheme.onBackground
-                )
-                Text(
-                    "Personaliza a DarmixPet a tu gusto",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-            }
+            Text(
+                "Ajustes",
+                style = MaterialTheme.typography.headlineMedium,
+                color = scheme.onBackground
+            )
+            Text(
+                "Personaliza a DarmixPet a tu gusto",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant
+            )
         }
 
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
@@ -264,13 +251,13 @@ private fun ThemeOptionCard(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(scheme.tertiary)
+                                .background(scheme.primary)
                                 .border(2.dp, colors.ink, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 DarmixIcons.Check, contentDescription = null,
-                                tint = scheme.onTertiary, modifier = Modifier.size(14.dp)
+                                tint = scheme.onPrimary, modifier = Modifier.size(14.dp)
                             )
                         }
                     }
@@ -296,24 +283,27 @@ private class MiniPalette(
     val ok: Color
 )
 
-private val LightMini = MiniPalette(
-    bg = LightBackground, surface = LightSurface, primary = LightPrimary,
-    ink = LightDarmixColors.ink, text = LightOnSurface, ok = LightDarmixColors.available
-)
-private val DarkMini = MiniPalette(
-    bg = DarkBackground, surface = DarkSurface, primary = DarkPrimary,
-    ink = DarkDarmixColors.ink, text = DarkOnSurface, ok = DarkDarmixColors.available
+private fun miniOf(palette: ThemePalette) = MiniPalette(
+    bg = palette.scheme.background,
+    surface = palette.scheme.surface,
+    primary = palette.scheme.primary,
+    ink = palette.extras.ink,
+    text = palette.scheme.onSurface,
+    ok = palette.scheme.primary
 )
 
 @Composable
 private fun ThemePreview(mode: ThemeMode, modifier: Modifier = Modifier) {
+    val skinId by rememberSelectedSkinId()
+    val light = remember(skinId) { miniOf(AppPalettes.forSkin(skinId, dark = false)) }
+    val dark = remember(skinId) { miniOf(AppPalettes.forSkin(skinId, dark = true)) }
     Canvas(modifier = modifier) {
         when (mode) {
-            ThemeMode.LIGHT -> drawMiniScreen(LightMini)
-            ThemeMode.DARK -> drawMiniScreen(DarkMini)
+            ThemeMode.LIGHT -> drawMiniScreen(light)
+            ThemeMode.DARK -> drawMiniScreen(dark)
             ThemeMode.SYSTEM -> {
-                drawMiniScreen(LightMini)
-                clipRect(left = size.width / 2f) { drawMiniScreen(DarkMini) }
+                drawMiniScreen(light)
+                clipRect(left = size.width / 2f) { drawMiniScreen(dark) }
             }
         }
     }
@@ -377,7 +367,7 @@ private fun AboutCard(
 
     val hasUpdate = update != null
     val cardFill by animateColorAsState(
-        targetValue = if (hasUpdate) colors.goldContainer else scheme.surface,
+        targetValue = if (hasUpdate) scheme.primaryContainer else scheme.surface,
         animationSpec = tween(300),
         label = "aboutFill"
     )
@@ -443,19 +433,19 @@ private fun AboutCard(
 
         Spacer(Modifier.height(16.dp))
         if (update != null) {
-            StatusBadge("Nueva versión v${update.latestVersion}", DarmixIcons.Download, colors.gold, colors.onGold)
+            StatusBadge("Nueva versión v${update.latestVersion}", DarmixIcons.Download, scheme.primary, scheme.onPrimary)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Toca aquí para actualizar",
                 style = MaterialTheme.typography.labelMedium,
-                color = colors.onGoldContainer
+                color = scheme.onPrimaryContainer
             )
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (version.isNotBlank()) {
-                    StatusBadge("Versión $version", DarmixIcons.Sparkle, colors.goldContainer, colors.onGoldContainer)
+                    StatusBadge("Versión $version", DarmixIcons.Sparkle, scheme.surfaceVariant, scheme.onSurface)
                 }
-                StatusBadge("Con cariño", DarmixIcons.Heart, colors.blockedContainer, colors.onBlockedContainer)
+                StatusBadge("Con cariño", DarmixIcons.Heart, scheme.primaryContainer, scheme.onPrimaryContainer)
             }
         }
     }
@@ -478,7 +468,7 @@ private fun GuideEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .sticker(shape = MaterialTheme.shapes.large, fill = colors.goldContainer, depth = 4.dp)
+            .sticker(shape = MaterialTheme.shapes.large, fill = scheme.primaryContainer, depth = 4.dp)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -499,7 +489,7 @@ private fun GuideEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Icon(
                 DarmixIcons.Paw, contentDescription = null,
-                tint = colors.onGoldContainer, modifier = Modifier.size(28.dp)
+                tint = scheme.onPrimaryContainer, modifier = Modifier.size(28.dp)
             )
         }
         Spacer(Modifier.width(14.dp))
@@ -507,17 +497,17 @@ private fun GuideEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
             Text(
                 "Cómo jugar con tu mascota",
                 style = MaterialTheme.typography.titleSmall,
-                color = colors.onGoldContainer
+                color = scheme.onPrimaryContainer
             )
             Text(
                 "Toques, mantener presionado, arrastrar y más",
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.onGoldContainer.copy(alpha = 0.85f)
+                color = scheme.onPrimaryContainer.copy(alpha = 0.85f)
             )
         }
         Icon(
             DarmixIcons.ChevronRight, contentDescription = null,
-            tint = colors.onGoldContainer, modifier = Modifier.size(22.dp)
+            tint = scheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
         )
     }
 }

@@ -177,7 +177,7 @@ fun DarmixSplashScreen(onFinished: () -> Unit) {
                         val a = (i * 45f + 22.5f) * (PI / 180f).toFloat()
                         val r = 62.dp.toPx() + t * 78.dp.toPx()
                         val starR = 13.dp.toPx() * (1f - t) + 3.dp.toPx()
-                        val c = if (i % 2 == 0) colors.gold else accent
+                        val c = if (i % 2 == 0) colors.accent else accent
                         drawSparkle(
                             center = Offset(cx + r * cos(a), cy + r * sin(a)),
                             radius = starR,

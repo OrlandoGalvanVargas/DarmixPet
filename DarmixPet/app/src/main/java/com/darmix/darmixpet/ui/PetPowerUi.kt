@@ -92,11 +92,11 @@ fun PetPowerCard(modifier: Modifier = Modifier) {
     var confirmSleep by remember { mutableStateOf(false) }
 
     val fill by animateColorAsState(
-        targetValue = if (enabled) scheme.tertiaryContainer else scheme.surfaceVariant,
+        targetValue = if (enabled) scheme.primaryContainer else scheme.surfaceVariant,
         animationSpec = tween(300),
         label = "petCardFill"
     )
-    val onFill = if (enabled) scheme.onTertiaryContainer else scheme.onSurface
+    val onFill = if (enabled) scheme.onPrimaryContainer else scheme.onSurface
 
     Row(
         modifier = modifier
@@ -121,9 +121,9 @@ fun PetPowerCard(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(6.dp))
             if (enabled) {
-                StatusBadge("Vigilando", DarmixIcons.Check, colors.available, scheme.onTertiary)
+                StatusBadge("Vigilando", DarmixIcons.Check, scheme.primary, scheme.onPrimary)
             } else {
-                StatusBadge("En pausa", DarmixIcons.Moon, colors.cooldown, scheme.onSecondary)
+                StatusBadge("En pausa", DarmixIcons.Moon, scheme.onSurfaceVariant, scheme.surface)
             }
         }
         Spacer(Modifier.width(8.dp))
@@ -152,7 +152,7 @@ fun PetPowerCard(modifier: Modifier = Modifier) {
 private fun PetStateBadge(enabled: Boolean) {
     val scheme = MaterialTheme.colorScheme
     if (enabled) {
-        HatBadge(size = 56.dp)
+        HatBadge(size = 56.dp, fill = scheme.surface, tint = scheme.onPrimaryContainer)
         return
     }
     val transition = rememberInfiniteTransition(label = "zzz")
@@ -285,7 +285,7 @@ fun PetSleepBanner(modifier: Modifier = Modifier) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .sticker(shape = MaterialTheme.shapes.large, fill = colors.cooldownContainer, depth = 3.dp)
+                    .sticker(shape = MaterialTheme.shapes.large, fill = scheme.primaryContainer, depth = 3.dp)
                     .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -299,7 +299,7 @@ fun PetSleepBanner(modifier: Modifier = Modifier) {
                 ) {
                     Icon(
                         DarmixIcons.Moon, contentDescription = null,
-                        tint = colors.onCooldownContainer, modifier = Modifier.size(22.dp)
+                        tint = scheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(Modifier.width(10.dp))
@@ -307,12 +307,12 @@ fun PetSleepBanner(modifier: Modifier = Modifier) {
                     Text(
                         "Mascota dormida",
                         style = MaterialTheme.typography.titleSmall,
-                        color = colors.onCooldownContainer
+                        color = scheme.onPrimaryContainer
                     )
                     Text(
                         "Tus límites están en pausa",
                         style = MaterialTheme.typography.bodySmall,
-                        color = colors.onCooldownContainer.copy(alpha = 0.85f)
+                        color = scheme.onPrimaryContainer.copy(alpha = 0.85f)
                     )
                 }
                 SquishButton(

@@ -20,10 +20,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.darmix.darmixpet.ui.icons.DarmixIcons
-
+import androidx.compose.ui.graphics.Color
 
 @Composable
-fun HatBadge(modifier: Modifier = Modifier, size: Dp = 68.dp) {
+fun HatBadge(
+    modifier: Modifier = Modifier,
+    size: Dp = 68.dp,
+    fill: Color = MaterialTheme.colorScheme.primaryContainer,
+    tint: Color = MaterialTheme.colorScheme.onPrimaryContainer
+) {
     val transition = rememberInfiniteTransition(label = "hatWobble")
     val angle by transition.animateFloat(
         initialValue = -7f,
@@ -39,7 +44,7 @@ fun HatBadge(modifier: Modifier = Modifier, size: Dp = 68.dp) {
             .size(size)
             .sticker(
                 shape = CircleShape,
-                fill = MaterialTheme.colorScheme.primaryContainer,
+                fill = fill,
                 depth = 4.dp
             ),
         contentAlignment = Alignment.Center
@@ -47,7 +52,7 @@ fun HatBadge(modifier: Modifier = Modifier, size: Dp = 68.dp) {
         Icon(
             imageVector = DarmixIcons.Hat,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            tint = tint,
             modifier = Modifier
                 .size(size * 0.58f)
                 .graphicsLayer {

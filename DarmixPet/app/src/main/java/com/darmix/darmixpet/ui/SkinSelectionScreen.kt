@@ -97,7 +97,7 @@ import kotlin.math.PI
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sin
-
+import com.darmix.darmixpet.ui.theme.AppPalettes
 
 private val SpriteFilterQuality = FilterQuality.Medium
 
@@ -141,7 +141,9 @@ fun SkinSelectionScreen(modifier: Modifier = Modifier) {
     val viewedPage = pagerState.currentPage
     val viewed = skins[viewedPage]
     val viewedLore = SkinLore.forId(viewed.id)
-    val accent by animateColorAsState(Color(viewed.accentColor), tween(300), label = "accent")
+    val viewedScheme = AppPalettes.forSkin(viewed.id, DarmixTheme.isDark).scheme
+    val chooseContainer by animateColorAsState(viewedScheme.primary, tween(300), label = "chooseContainer")
+    val chooseContent by animateColorAsState(viewedScheme.onPrimary, tween(300), label = "chooseContent")
 
     fun goTo(page: Int) {
         val target = ((page % skins.size) + skins.size) % skins.size
@@ -253,8 +255,8 @@ fun SkinSelectionScreen(modifier: Modifier = Modifier) {
                         scope.launch { celebrate.emit(viewedPage) }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    container = accent,
-                    content = readableOn(accent),
+                    container = chooseContainer,
+                    content = chooseContent,
                     icon = DarmixIcons.Check,
                     fillWidth = true
                 )
@@ -290,6 +292,9 @@ private fun SkinStage(
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
+    val skinColors = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).extras
+    val skinScheme = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).scheme
+    val isDark = DarmixTheme.isDark
     val accent = Color(skin.accentColor)
     val stageFill = accent.copy(alpha = 0.20f).compositeOver(scheme.surface)
 
@@ -368,7 +373,7 @@ private fun SkinStage(
                     val w = 100.dp.toPx() * k
                     val h = 16.dp.toPx() * k
                     drawOval(
-                        color = colors.ink.copy(alpha = 0.28f),
+                        color = if (isDark) Color.Black.copy(alpha = 0.35f) else colors.ink.copy(alpha = 0.28f),
                         topLeft = Offset(cx - w / 2f, cy + 88.dp.toPx() - h / 2f),
                         size = Size(w, h)
                     )
@@ -378,7 +383,7 @@ private fun SkinStage(
                         drawStar(
                             center = Offset(size.width * fx, size.height * fy),
                             radius = (4f + 6f * pulse).dp.toPx(),
-                            color = colors.gold.copy(alpha = 0.35f + 0.6f * pulse)
+                            color = skinColors.accent.copy(alpha = 0.35f + 0.6f * pulse)
                         )
                     }
                 },
@@ -410,7 +415,7 @@ private fun SkinStage(
                     for (i in 0 until 10) {
                         val a = (i * 36f + 12f) * (PI / 180f).toFloat()
                         val r = 50.dp.toPx() + t * 110.dp.toPx()
-                        val c = if (i % 2 == 0) colors.gold else accent
+                        val c = if (i % 2 == 0) skinColors.accent else accent
                         drawStar(
                             center = Offset(cx + r * cos(a), cy + r * sin(a)),
                             radius = 12.dp.toPx() * (1f - t) + 2.dp.toPx(),
@@ -427,7 +432,7 @@ private fun SkinStage(
                     enter = scaleIn(spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium)),
                     exit = scaleOut()
                 ) {
-                    StatusBadge("Tu compañero", DarmixIcons.Check, colors.gold, colors.onGold)
+                    StatusBadge("Tu compañero", DarmixIcons.Check, skinScheme.primary, skinScheme.onPrimary)
                 }
             }
         }
@@ -462,7 +467,7 @@ private fun DrawScope.drawStar(center: Offset, radius: Float, color: Color) {
 
 
 private fun readableOn(background: Color): Color =
-    if (background.luminance() > 0.45f) Color(0xFF2A2233) else Color.White
+    if (background.luminance() > 0.45f) Color(0xFF1B1F27) else Color.White
 
 
 
@@ -510,7 +515,7 @@ private fun CurrentCompanionBanner() {
             .padding(end = 4.dp, bottom = 4.dp)
             .sticker(
                 shape = RoundedCornerShape(20.dp),
-                fill = scheme.tertiaryContainer,
+                fill = scheme.primaryContainer,
                 depth = 3.dp
             )
             .heightIn(min = 56.dp)
@@ -520,13 +525,13 @@ private fun CurrentCompanionBanner() {
     ) {
         Icon(
             DarmixIcons.Check, contentDescription = null,
-            tint = scheme.onTertiaryContainer, modifier = Modifier.size(22.dp)
+            tint = scheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.width(8.dp))
         Text(
             "Es tu compañero actual",
             style = MaterialTheme.typography.labelLarge,
-            color = scheme.onTertiaryContainer
+            color = scheme.onPrimaryContainer
         )
     }
 }
@@ -537,6 +542,8 @@ private fun CurrentCompanionBanner() {
 private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
+    val skinColors = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).extras
+    val skinScheme = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).scheme
     val accent = Color(skin.accentColor)
 
     Column(
@@ -597,7 +604,7 @@ private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
                 .fillMaxWidth()
                 .sticker(
                     shape = RoundedCornerShape(20.dp),
-                    fill = colors.goldContainer,
+                    fill = skinScheme.primaryContainer,
                     depth = 0.dp,
                     borderWidth = 1.5.dp
                 )
@@ -606,20 +613,20 @@ private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
         ) {
             Icon(
                 DarmixIcons.Sparkle, contentDescription = null,
-                tint = colors.onGoldContainer, modifier = Modifier.size(22.dp)
+                tint = skinScheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(10.dp))
             Column {
                 Text(
                     "Su misión en la app",
                     style = MaterialTheme.typography.labelMedium,
-                    color = colors.onGoldContainer
+                    color = skinScheme.onPrimaryContainer
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     lore.mission,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onGoldContainer
+                    color = skinScheme.onPrimaryContainer
                 )
             }
         }
@@ -634,7 +641,11 @@ private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
                                 .size(28.dp)
                                 .clip(CircleShape)
                                 .background(Color(hex))
-                                .border(2.dp, colors.ink, CircleShape)
+                                .border(
+                                    2.dp,
+                                    if (DarmixTheme.isDark) scheme.onSurfaceVariant.copy(alpha = 0.6f) else colors.ink,
+                                    CircleShape
+                                )
                         )
                     }
                 }

@@ -22,7 +22,7 @@ class PetAuraView(context: Context, private val petSizePx: Int) : View(context) 
         private const val BLUR_RADIUS_DP = 14f
         private const val PULSE_MS = 1600L
         private const val MIN_ALPHA = 0.45f
-        private const val NOTIFICATION_AURA_COLOR = 0xFFFF2E93.toInt()
+        private const val NOTIFICATION_AURA_COLOR = 0xFFFF3D3D.toInt()
     }
 
     private class Glow(val bitmap: Bitmap, val offsetX: Int, val offsetY: Int)

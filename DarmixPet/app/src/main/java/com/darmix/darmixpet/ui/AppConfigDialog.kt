@@ -64,6 +64,7 @@ import com.darmix.darmixpet.ui.components.SquishIconButton
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
 @Composable
 fun AppConfigDialog(
@@ -77,6 +78,9 @@ fun AppConfigDialog(
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
+
+    val skinId by rememberSelectedSkinId()
+    val petName = SkinLore.forId(skinId).shortName
 
     var sessionText by remember { mutableStateOf(initialSessionMinutes.toString()) }
     var cooldownText by remember { mutableStateOf(initialCooldownMinutes.toString()) }
@@ -174,8 +178,8 @@ fun AppConfigDialog(
                     maxValue = 999,
                     presets = listOf(15, 30, 45, 60),
                     presetLabel = ::minutesShort,
-                    accent = scheme.primaryContainer,
-                    onAccent = scheme.onPrimaryContainer
+                    iconBubble = scheme.surface,
+                    iconTint = scheme.onSurface
                 )
                 ConfigSection(
                     icon = DarmixIcons.Snowflake,
@@ -188,8 +192,8 @@ fun AppConfigDialog(
                     maxValue = 999,
                     presets = listOf(15, 30, 60, 120),
                     presetLabel = ::minutesShort,
-                    accent = scheme.secondaryContainer,
-                    onAccent = scheme.onSecondaryContainer
+                    iconBubble = scheme.surface,
+                    iconTint = scheme.onSurface
                 )
                 ConfigSection(
                     icon = DarmixIcons.Ticket,
@@ -202,8 +206,8 @@ fun AppConfigDialog(
                     maxValue = 99,
                     presets = listOf(1, 2, 3, 5),
                     presetLabel = { it.toString() },
-                    accent = scheme.tertiaryContainer,
-                    onAccent = scheme.onTertiaryContainer
+                    iconBubble = scheme.surface,
+                    iconTint = scheme.onSurface
                 )
             }
 
@@ -215,25 +219,25 @@ fun AppConfigDialog(
                     .fillMaxWidth()
                     .sticker(
                         shape = RoundedCornerShape(22.dp),
-                        fill = colors.goldContainer,
+                        fill = scheme.primaryContainer,
                         depth = 0.dp,
                         borderWidth = 1.5.dp
                     )
                     .padding(start = 12.dp, top = 12.dp, bottom = 16.dp, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HatBadge(size = 44.dp)
+                HatBadge(size = 44.dp, fill = scheme.surface, tint = scheme.onPrimaryContainer)
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.animateContentSize()) {
                     Text(
-                        "Archi dice",
+                        "$petName dice",
                         style = MaterialTheme.typography.labelSmall,
-                        color = colors.onGoldContainer.copy(alpha = 0.8f)
+                        color = scheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                     Text(
                         summary,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onGoldContainer
+                        color = scheme.onPrimaryContainer
                     )
                 }
             }
@@ -285,8 +289,8 @@ private fun ConfigSection(
     maxValue: Int,
     presets: List<Int>,
     presetLabel: (Int) -> String,
-    accent: Color,
-    onAccent: Color
+    iconBubble: Color,
+    iconTint: Color
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
@@ -298,7 +302,7 @@ private fun ConfigSection(
             .fillMaxWidth()
             .sticker(
                 shape = RoundedCornerShape(22.dp),
-                fill = accent,
+                fill = scheme.surfaceVariant,
                 depth = 0.dp,
                 borderWidth = 1.5.dp
             )
@@ -309,19 +313,19 @@ private fun ConfigSection(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(scheme.surface)
+                    .background(iconBubble)
                     .border(2.dp, colors.ink, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = onAccent, modifier = Modifier.size(22.dp))
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(label, style = MaterialTheme.typography.titleSmall, color = onAccent)
+                Text(label, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
                 Text(
                     hint,
                     style = MaterialTheme.typography.bodySmall,
-                    color = onAccent.copy(alpha = 0.8f)
+                    color = scheme.onSurfaceVariant
                 )
             }
         }
@@ -339,7 +343,7 @@ private fun ConfigSection(
                 onClick = { setValue((current ?: 0) - step) },
                 enabled = (current ?: 0) > 1,
                 container = scheme.surface,
-                content = onAccent,
+                content = scheme.onSurface,
                 repeatWhileHeld = true
             )
             ValueField(
@@ -354,7 +358,7 @@ private fun ConfigSection(
                 onClick = { setValue((current ?: 0) + step) },
                 enabled = (current ?: 0) < maxValue,
                 container = scheme.surface,
-                content = onAccent,
+                content = scheme.onSurface,
                 repeatWhileHeld = true
             )
         }
@@ -369,8 +373,6 @@ private fun ConfigSection(
                 PresetChip(
                     text = presetLabel(preset),
                     selected = current == preset,
-                    accent = accent,
-                    onAccent = onAccent,
                     modifier = Modifier.weight(1f),
                     onClick = { setValue(preset) }
                 )
@@ -438,14 +440,12 @@ private fun ValueField(
 private fun PresetChip(
     text: String,
     selected: Boolean,
-    accent: Color,
-    onAccent: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
-    val fill by animateColorAsState(if (selected) onAccent else scheme.surface, tween(200), label = "chipFill")
-    val label by animateColorAsState(if (selected) accent else scheme.onSurface, tween(200), label = "chipText")
+    val fill by animateColorAsState(if (selected) scheme.primary else scheme.surface, tween(200), label = "chipFill")
+    val label by animateColorAsState(if (selected) scheme.onPrimary else scheme.onSurface, tween(200), label = "chipText")
 
     Box(
         modifier = modifier

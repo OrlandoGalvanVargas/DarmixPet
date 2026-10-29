@@ -39,6 +39,7 @@ import com.darmix.darmixpet.ui.theme.ThemeMode
 import com.darmix.darmixpet.ui.theme.ThemePreferences
 import com.darmix.darmixpet.update.UpdateManager
 import com.darmix.darmixpet.notifications.NotificationAccessHelper
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,7 +69,9 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
-            DarmixPetTheme(themeMode = themeMode) {
+            val skinId by rememberSelectedSkinId()
+
+            DarmixPetTheme(themeMode = themeMode, skinId = skinId) {
                 var showSplash by rememberSaveable { mutableStateOf(true) }
 
                 if (showSplash) {
