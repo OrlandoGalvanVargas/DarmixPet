@@ -86,7 +86,7 @@ import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
 import kotlinx.coroutines.delay
 import com.darmix.darmixpet.notifications.NotificationAccessHelper
-
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
 
 private enum class PermKey { RESTRICTED, OVERLAY, USAGE, NOTIFICATIONS, NOTIFICATION_ACCESS, BATTERY, ACCESSIBILITY, WRITE_SETTINGS }
@@ -190,7 +190,7 @@ private const val RESTRICTED_WARNING =
     "¿El interruptor sale gris o ves el aviso «Ajuste restringido»? Completa antes el paso " +
             "«Permitir ajustes restringidos» (arriba en esta pantalla)."
 
-private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Boolean): PermGuide {
+private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Boolean, petName: String): PermGuide {
     val restrictedNote = if (restrictedNeeded) listOf(GuideNote(NoteKind.WARNING, RESTRICTED_WARNING)) else emptyList()
     return when (key) {
         PermKey.RESTRICTED -> PermGuide(
@@ -224,7 +224,7 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
         PermKey.OVERLAY -> PermGuide(
             icon = DarmixIcons.Overlay,
             title = "Mostrar sobre otras apps",
-            intro = "Permite que Archi aparezca flotando sobre tus apps.",
+            intro = "Permite que $petName aparezca flotando sobre tus apps.",
             steps = listOf(
                 "Se abrirá la pantalla de DarmixPet.",
                 "Activa «Permitir mostrar sobre otras apps».",
@@ -256,7 +256,7 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
         PermKey.NOTIFICATIONS -> PermGuide(
             icon = DarmixIcons.Bell,
             title = "Notificaciones",
-            intro = "Sirven para avisarte cuando una app entra en descanso y para mostrar que Archi está activo.",
+            intro = "Sirven para avisarte cuando una app entra en descanso y para mostrar que $petName está activo.",
             steps = if (notifBlocked) listOf(
                 "Como rechazaste el permiso antes, Android ya no muestra la ventana de aviso.",
                 "Se abrirán los ajustes de notificaciones de DarmixPet.",
@@ -271,7 +271,7 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
         PermKey.NOTIFICATION_ACCESS -> PermGuide(
             icon = DarmixIcons.Mail,
             title = "Leer notificaciones",
-            intro = "Permite que Archi te muestre tus notificaciones con un toque, para leerlas, " +
+            intro = "Permite que $petName te muestre tus notificaciones con un toque, para leerlas, " +
                     "abrirlas o eliminarlas sin bajar la barra.",
             steps = listOf(
                 "Se abrirá «Acceso a notificaciones». Si ves una lista de apps, busca «DarmixPet» y tócalo.",
@@ -282,7 +282,7 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
             notes = restrictedNote + listOf(
                 GuideNote(
                     NoteKind.TIP,
-                    "DarmixPet solo lee tus notificaciones para mostrártelas en Archi. " +
+                    "DarmixPet solo lee tus notificaciones para mostrártelas en $petName. " +
                             "No las guarda ni las envía a ningún lado."
                 ),
                 GuideNote(
@@ -298,7 +298,7 @@ private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Bo
         PermKey.BATTERY -> PermGuide(
             icon = DarmixIcons.Battery,
             title = "Ignorar optimización de batería",
-            intro = "Para que Archi no se cierre solo por ahorro de batería. Si se cierra, dejas de estar protegido.",
+            intro = "Para que $petName no se cierre solo por ahorro de batería. Si se cierra, dejas de estar protegido.",
             steps = listOf(
                 "Se abrirá la configuración de batería de DarmixPet.",
                 "Elige «Sin restricciones». Según tu teléfono puede llamarse «No optimizar» o «Permitir».",
@@ -354,6 +354,9 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = remember(context) { context.findActivity() }
+
+    val skinId by rememberSelectedSkinId()
+    val petName = SkinLore.forId(skinId).shortName
 
     var hasOverlay by remember { mutableStateOf(OverlayPermissionHelper.hasOverlayPermission(context)) }
     var hasUsageStats by remember { mutableStateOf(UsageStatsPermissionHelper.hasUsageStatsPermission(context)) }
@@ -460,16 +463,16 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
 
     val items = listOf(
         PermItem(PermKey.OVERLAY, DarmixIcons.Overlay, "Mostrar sobre otras apps",
-            "Para que Archi pueda pasear sobre tus apps.", hasOverlay),
+            "Para que $petName pueda pasear sobre tus apps.", hasOverlay),
         PermItem(PermKey.USAGE, DarmixIcons.Hourglass, "Acceso a datos de uso",
             "Para saber cuánto tiempo pasas en cada app.", hasUsageStats),
         PermItem(PermKey.NOTIFICATIONS, DarmixIcons.Bell, "Notificaciones",
             "Para avisarte cuando una app entra en descanso.", hasNotifications,
             actionLabel = if (notifBlocked) "Abrir ajustes" else "Activar"),
         PermItem(PermKey.NOTIFICATION_ACCESS, DarmixIcons.Mail, "Leer notificaciones",
-            "Para que Archi te muestre tus notificaciones con un toque.", hasNotificationAccess),
+            "Para que $petName te muestre tus notificaciones con un toque.", hasNotificationAccess),
         PermItem(PermKey.BATTERY, DarmixIcons.Battery, "Ignorar optimización de batería",
-            "Para que Archi no desaparezca por ahorro de batería.", hasBatteryExemption),
+            "Para que $petName no desaparezca por ahorro de batería.", hasBatteryExemption),
         PermItem(PermKey.ACCESSIBILITY, DarmixIcons.Eye, "Detección instantánea",
             "Para saber al instante cuándo abres una app vigilada.", hasAccessibility),
         PermItem(PermKey.WRITE_SETTINGS, DarmixIcons.Sun, "Modificar ajustes del sistema",
@@ -509,7 +512,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
             }
 
             Spacer(Modifier.height(24.dp))
-            ProgressCard(done = grantedCount, total = items.size)
+            ProgressCard(done = grantedCount, total = items.size, petName = petName)
             Spacer(Modifier.height(20.dp))
 
             var index = 0
@@ -533,13 +536,11 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                 )
                 Spacer(Modifier.height(14.dp))
             }
-
-            FooterNote()
         }
     }
 
     openGuide?.let { key ->
-        val guide = buildGuide(key, restrictedNeeded, notifBlocked)
+        val guide = buildGuide(key, restrictedNeeded, notifBlocked, petName)
         PermissionGuideDialog(
             guide = guide,
             onDismiss = { openGuide = null },
@@ -687,8 +688,8 @@ private fun NoteBox(note: GuideNote) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val warning = note.kind == NoteKind.WARNING
-    val fill = if (warning) colors.cooldownContainer else scheme.primaryContainer
-    val onFill = if (warning) colors.onCooldownContainer else scheme.onPrimaryContainer
+    val fill = if (warning) scheme.surfaceVariant else scheme.primaryContainer
+    val onFill = if (warning) scheme.onSurface else scheme.onPrimaryContainer
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -704,7 +705,7 @@ private fun NoteBox(note: GuideNote) {
         Icon(
             if (warning) DarmixIcons.Lock else DarmixIcons.Sparkle,
             contentDescription = null,
-            tint = onFill,
+            tint = if (warning) colors.blocked else onFill,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(10.dp))
@@ -715,7 +716,8 @@ private fun NoteBox(note: GuideNote) {
 
 
 @Composable
-private fun ProgressCard(done: Int, total: Int) {
+private fun ProgressCard(done: Int, total: Int, petName: String) {
+    val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
     val message = when {
         done == 0 -> "¡Empecemos!"
@@ -732,7 +734,7 @@ private fun ProgressCard(done: Int, total: Int) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Archi dice",
+                    "$petName dice",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -741,14 +743,14 @@ private fun ProgressCard(done: Int, total: Int) {
             Row(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(colors.accentContainer)
+                    .background(scheme.primaryContainer)
                     .border(2.dp, colors.ink, CircleShape)
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(DarmixIcons.Sparkle, null, tint = colors.onAccentContainer, modifier = Modifier.size(16.dp))
+                Icon(DarmixIcons.Sparkle, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("$done/$total", style = MaterialTheme.typography.labelLarge, color = colors.onAccentContainer)
+                Text("$done/$total", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimaryContainer)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -762,7 +764,7 @@ private fun ProgressCard(done: Int, total: Int) {
 private fun Gem(filled: Boolean, modifier: Modifier = Modifier) {
     val colors = DarmixTheme.colors
     val fill by animateColorAsState(
-        targetValue = if (filled) colors.accent else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(350),
         label = "gemFill"
     )
@@ -797,29 +799,25 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
         label = "cardDepth"
     )
-    val pendingFill = if (item.key == PermKey.RESTRICTED) colors.accentContainer else scheme.surface
+    val isRestricted = item.key == PermKey.RESTRICTED
+    val pendingFill = if (isRestricted) scheme.primaryContainer else scheme.surface
     val fill by animateColorAsState(
-        targetValue = if (item.granted) scheme.tertiaryContainer else pendingFill,
+        targetValue = if (item.granted) scheme.primaryContainer else pendingFill,
         animationSpec = tween(300),
         label = "cardFill"
     )
 
-    val bubbleTarget = if (item.granted) scheme.tertiary else when {
-        item.key == PermKey.RESTRICTED -> colors.accent
-        index % 3 == 0 -> scheme.primaryContainer
-        index % 3 == 1 -> scheme.secondaryContainer
-        else -> colors.accentContainer
+    val bubbleTarget = when {
+        item.granted || isRestricted -> scheme.primary
+        else -> scheme.primaryContainer
     }
-    val glyphTarget = if (item.granted) scheme.onTertiary else when {
-        item.key == PermKey.RESTRICTED -> colors.onAccent
-        index % 3 == 0 -> scheme.onPrimaryContainer
-        index % 3 == 1 -> scheme.onSecondaryContainer
-        else -> colors.onAccentContainer
+    val glyphTarget = when {
+        item.granted || isRestricted -> scheme.onPrimary
+        else -> scheme.onPrimaryContainer
     }
     val bubble by animateColorAsState(bubbleTarget, tween(300), label = "bubble")
     val glyph by animateColorAsState(glyphTarget, tween(300), label = "glyph")
-    val onFill = if (item.granted) scheme.onTertiaryContainer
-    else if (item.key == PermKey.RESTRICTED) colors.onAccentContainer else scheme.onSurface
+    val onFill = if (item.granted || isRestricted) scheme.onPrimaryContainer else scheme.onSurface
 
     Column(
         modifier = Modifier
@@ -833,7 +831,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
             .padding(14.dp)
     ) {
         if (item.badge != null && !item.granted) {
-            StatusBadge(item.badge, DarmixIcons.Sparkle, colors.accent, colors.onAccent)
+            StatusBadge(item.badge, DarmixIcons.Sparkle, scheme.primary, scheme.onPrimary)
             Spacer(Modifier.height(10.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -853,7 +851,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
                 Text(
                     item.why,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (item.granted) scheme.onTertiaryContainer else scheme.onSurfaceVariant
+                    color = if (item.granted) scheme.onPrimaryContainer else scheme.onSurfaceVariant
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -879,7 +877,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
         if (highlight && !item.granted) {
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(DarmixIcons.Sparkle, null, tint = scheme.secondary, modifier = Modifier.size(16.dp))
+                Icon(DarmixIcons.Sparkle, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Te mostramos los pasos antes de abrir los ajustes.",
@@ -897,36 +895,14 @@ private fun CheckStamp() {
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.tertiary)
+            .background(MaterialTheme.colorScheme.primary)
             .border(2.dp, DarmixTheme.colors.ink, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             DarmixIcons.Check, null,
-            tint = MaterialTheme.colorScheme.onTertiary,
+            tint = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier.size(22.dp)
-        )
-    }
-}
-
-@Composable
-private fun FooterNote() {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(scheme.surfaceVariant)
-            .padding(14.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Icon(DarmixIcons.Bell, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(
-            "Es normal que Android muestre un aviso como «DarmixPet se muestra sobre otras apps». " +
-                    "Lo pone el sistema, no la app, y no afecta nada. Puedes ocultarlo desde Ajustes → Ayuda.",
-            style = MaterialTheme.typography.bodySmall,
-            color = scheme.onSurfaceVariant
         )
     }
 }

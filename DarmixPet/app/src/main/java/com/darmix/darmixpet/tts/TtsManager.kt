@@ -38,9 +38,10 @@ class TtsManager(context: Context) {
         }
     }
 
-    fun speak(text: String) {
+    fun speak(text: String, interrupt: Boolean = true) {
         if (!isReady || !VoicePreferences.isEnabled(appContext)) return
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        val mode = if (interrupt) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        tts.speak(text, mode, null, null)
     }
 
     fun shutdown() {

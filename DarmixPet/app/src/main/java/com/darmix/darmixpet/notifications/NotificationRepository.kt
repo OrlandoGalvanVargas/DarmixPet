@@ -5,6 +5,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 object NotificationRepository {
 
@@ -13,6 +16,13 @@ object NotificationRepository {
 
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private val _arrivals = MutableSharedFlow<MessageArrival>(extraBufferCapacity = 16)
+    val arrivals: SharedFlow<MessageArrival> = _arrivals.asSharedFlow()
+
+    internal fun emitArrival(arrival: MessageArrival) {
+        _arrivals.tryEmit(arrival)
+    }
 
     private var listenerRef: WeakReference<DarmixNotificationListener>? = null
 

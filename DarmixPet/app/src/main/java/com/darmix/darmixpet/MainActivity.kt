@@ -40,6 +40,7 @@ import com.darmix.darmixpet.ui.theme.ThemePreferences
 import com.darmix.darmixpet.update.UpdateManager
 import com.darmix.darmixpet.notifications.NotificationAccessHelper
 import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
+import com.darmix.darmixpet.ui.theme.NightModeSync
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        NightModeSync.apply(this, ThemePreferences.getThemeMode(this))
         setContent {
             val context = LocalContext.current
             var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
@@ -132,6 +134,7 @@ class MainActivity : ComponentActivity() {
                                     onThemeModeChange = { newMode ->
                                         themeMode = newMode
                                         ThemePreferences.setThemeMode(context, newMode)
+                                        NightModeSync.apply(context, newMode)
                                     }
                                 )
                             }

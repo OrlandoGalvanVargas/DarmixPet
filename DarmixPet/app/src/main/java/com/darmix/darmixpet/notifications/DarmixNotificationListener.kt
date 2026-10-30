@@ -11,12 +11,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.app.NotificationManager
 
 class DarmixNotificationListener : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var syncJob: Job? = null
     private lateinit var parser: NotificationParser
+    private val announced = HashMap<String, String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -38,9 +40,15 @@ class DarmixNotificationListener : NotificationListenerService() {
         NotificationAccessHelper.requestRebind(this)
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification?) = requestSync()
+    override fun onNotificationPosted(sbn: StatusBarNotification?, rankingMap: RankingMap?) {
+        requestSync()
+        if (sbn != null) detectArrival(sbn, rankingMap)
+    }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) = requestSync()
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        requestSync()
+        if (sbn != null) forgetArrival(sbn.key)
+    }
 
     override fun onNotificationRankingUpdate(rankingMap: RankingMap?) = requestSync()
 
@@ -67,6 +75,30 @@ class DarmixNotificationListener : NotificationListenerService() {
     } catch (e: Exception) {
         Log.w(TAG, "No se pudo eliminar la notificación", e)
         false
+    }
+
+    @Synchronized
+    private fun detectArrival(sbn: StatusBarNotification, rankingMap: RankingMap?) {
+        if (MessageAlertApps.byPackage(sbn.packageName) == null) return
+        if (NotificationFilter.isPersistent(sbn) || NotificationFilter.isGroupSummary(sbn)) return
+
+        val ranking = Ranking()
+        if (rankingMap != null && rankingMap.getRanking(sbn.key, ranking)) {
+            if (!ranking.matchesInterruptionFilter()) return
+            if (ranking.importance < NotificationManager.IMPORTANCE_DEFAULT) return
+        }
+
+        val parsed = parser.parse(sbn) ?: return
+        val signature = "${parsed.title}|${parsed.text}"
+        if (announced[sbn.key] == signature) return
+        announced[sbn.key] = signature
+
+        NotificationRepository.emitArrival(MessageArrival(sbn.packageName, parsed.title))
+    }
+
+    @Synchronized
+    private fun forgetArrival(key: String) {
+        announced.remove(key)
     }
 
     private fun cancelOrphanSummary(target: StatusBarNotification, active: Array<StatusBarNotification>) {

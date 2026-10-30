@@ -623,7 +623,7 @@ private fun MenuMock(skin: SkinInfo, accent: Color) {
     val ink = Color(skin.theme.secondaryColor)
     val fill = Color(skin.theme.primaryColor).copy(alpha = 0.12f).compositeOver(Color.White)
     val icons = listOf(
-        DarmixIcons.Clock, DarmixIcons.Sun, DarmixIcons.Speaker, DarmixIcons.Cog, DarmixIcons.Hat
+        DarmixIcons.Clock, DarmixIcons.Sun, DarmixIcons.Speaker, DarmixIcons.Cog, DarmixIcons.Ghost
     )
     Column(
         modifier = Modifier

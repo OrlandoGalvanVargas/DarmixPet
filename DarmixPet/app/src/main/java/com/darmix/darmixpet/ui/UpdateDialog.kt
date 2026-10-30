@@ -92,7 +92,6 @@ fun UpdateDialog(
     onInstallClick: () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
     val notes = remember(releaseNotes) { parseReleaseNotes(releaseNotes) }
     val context = LocalContext.current
     val enter = remember { Animatable(0f) }
@@ -140,8 +139,8 @@ fun UpdateDialog(
             StatusBadge(
                 text = "v$currentVersion  →  v$latestVersion",
                 icon = DarmixIcons.Sparkle,
-                container = colors.accent,
-                content = colors.onAccent
+                container = scheme.primary,
+                content = scheme.onPrimary
             )
 
             Spacer(Modifier.height(14.dp))
@@ -178,7 +177,7 @@ fun UpdateDialog(
                             is NoteLine.Bullet -> Row(verticalAlignment = Alignment.Top) {
                                 Icon(
                                     DarmixIcons.Sparkle, contentDescription = null,
-                                    tint = scheme.secondary,
+                                    tint = scheme.primary,
                                     modifier = Modifier.padding(top = 3.dp).size(16.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))

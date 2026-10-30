@@ -11,6 +11,9 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.graphics.vector.group
 
 object DarmixIcons {
 
@@ -149,6 +152,59 @@ object DarmixIcons {
             wash(block = star)
             outline(width = 1.6f, block = star)
         }
+    }
+
+    val Ghost: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Ghost",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 76f,
+            viewportHeight = 76f
+        ).apply {
+            group(translationX = -16f, translationY = -13f) {
+                addPath(
+                    pathData = addPathNodes(GHOST_BODY),
+                    fill = SolidColor(Color.Black),
+                    fillAlpha = 0.28f
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_BODY),
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 5f,
+                    strokeLineJoin = StrokeJoin.Round
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_EYES),
+                    fill = SolidColor(Color.Black)
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_SMILE),
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 4.4f,
+                    strokeLineCap = StrokeCap.Round
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_BRIM),
+                    fill = SolidColor(Color.Black),
+                    fillAlpha = 0.55f,
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 5f
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_HAT_WITH_STAR),
+                    pathFillType = PathFillType.EvenOdd,
+                    fill = SolidColor(Color.Black),
+                    fillAlpha = 0.55f
+                )
+                addPath(
+                    pathData = addPathNodes(GHOST_HAT),
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 5f,
+                    strokeLineJoin = StrokeJoin.Round
+                )
+            }
+        }.build()
     }
 
     val Hat: ImageVector by lazy {
@@ -485,3 +541,24 @@ private fun PathBuilder.rrect(x: Float, y: Float, w: Float, h: Float, r: Float) 
     arcTo(r, r, 0f, false, true, x + r, y)
     close()
 }
+
+private const val GHOST_BODY =
+    "M33,66 C33,57.94 42.6,53 54,53 C65.4,53 75,57.94 75,66 L75,78 " +
+            "C75,81.87 71.87,85 68,85 C64.13,85 61,81.87 61,78 " +
+            "C61,81.87 57.87,85 54,85 C50.13,85 47,81.87 47,78 " +
+            "C47,81.87 43.87,85 40,85 C36.13,85 33,81.87 33,78 Z"
+
+private const val GHOST_EYES =
+    "M42.3,64 a3.2,4.2 0 1,0 6.4,0 a3.2,4.2 0 1,0 -6.4,0 Z " +
+            "M59.3,64 a3.2,4.2 0 1,0 6.4,0 a3.2,4.2 0 1,0 -6.4,0 Z"
+
+private const val GHOST_SMILE = "M49.5,71 Q54,75.4 58.5,71"
+
+private const val GHOST_BRIM =
+    "M28,45 C28,41.91 39.64,39.4 54,39.4 C68.36,39.4 80,41.91 80,45 " +
+            "C80,48.09 68.36,50.6 54,50.6 C39.64,50.6 28,48.09 28,45 Z"
+
+private const val GHOST_HAT = "M34,45 C38,34 48,24 59,17.5 C62,27 70,36 74,45 C66,48 42,48 34,45 Z"
+
+private const val GHOST_HAT_WITH_STAR = GHOST_HAT +
+        " M55.5,26.5 Q55.5,31.5 60.5,31.5 Q55.5,31.5 55.5,36.5 Q55.5,31.5 50.5,31.5 Q55.5,31.5 55.5,26.5 Z"

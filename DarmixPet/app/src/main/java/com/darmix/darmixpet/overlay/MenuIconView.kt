@@ -12,9 +12,42 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import androidx.core.graphics.PathParser
 
 enum class MenuIcon { CLOCK, SUN, SPEAKER, HAT, GEAR, MOON, CHEVRON_LEFT, CHEVRON_RIGHT, CLOSE, LOCK, HOURGLASS, BELL, TRASH }
-
+private object GhostPaths {
+    val body: Path by lazy {
+        PathParser.createPathFromPathData(
+            "M33,66 C33,57.94 42.6,53 54,53 C65.4,53 75,57.94 75,66 L75,78 " +
+                    "C75,81.87 71.87,85 68,85 C64.13,85 61,81.87 61,78 " +
+                    "C61,81.87 57.87,85 54,85 C50.13,85 47,81.87 47,78 " +
+                    "C47,81.87 43.87,85 40,85 C36.13,85 33,81.87 33,78 Z"
+        )
+    }
+    val eyes: Path by lazy {
+        PathParser.createPathFromPathData(
+            "M42.3,64 a3.2,4.2 0 1,0 6.4,0 a3.2,4.2 0 1,0 -6.4,0 Z " +
+                    "M59.3,64 a3.2,4.2 0 1,0 6.4,0 a3.2,4.2 0 1,0 -6.4,0 Z"
+        )
+    }
+    val smile: Path by lazy { PathParser.createPathFromPathData("M49.5,71 Q54,75.4 58.5,71") }
+    val brim: Path by lazy {
+        PathParser.createPathFromPathData(
+            "M28,45 C28,41.91 39.64,39.4 54,39.4 C68.36,39.4 80,41.91 80,45 " +
+                    "C80,48.09 68.36,50.6 54,50.6 C39.64,50.6 28,48.09 28,45 Z"
+        )
+    }
+    val hat: Path by lazy {
+        PathParser.createPathFromPathData("M34,45 C38,34 48,24 59,17.5 C62,27 70,36 74,45 C66,48 42,48 34,45 Z")
+    }
+    val hatWithStar: Path by lazy {
+        PathParser.createPathFromPathData(
+            "M34,45 C38,34 48,24 59,17.5 C62,27 70,36 74,45 C66,48 42,48 34,45 Z " +
+                    "M55.5,26.5 Q55.5,31.5 60.5,31.5 Q55.5,31.5 55.5,36.5 " +
+                    "Q55.5,31.5 50.5,31.5 Q55.5,31.5 55.5,26.5 Z"
+        ).apply { fillType = Path.FillType.EVEN_ODD }
+    }
+}
 object MenuIcons {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -24,7 +57,8 @@ object MenuIcons {
     private val wash = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val path = Path()
     private val tmp = Path()
-
+    private val solid = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val hatWash = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
     fun draw(canvas: Canvas, icon: MenuIcon, left: Float, top: Float, size: Float, color: Int, level: Int = 100) {
         val saved = canvas.save()
@@ -73,17 +107,7 @@ object MenuIcons {
                 }
                 shape(canvas, false)
             }
-            MenuIcon.HAT -> {
-                path.reset()
-                path.moveTo(12f, 3f)
-                path.cubicTo(11f, 7f, 9.4f, 11f, 7.3f, 16.2f)
-                path.cubicTo(9.6f, 17f, 14.4f, 17f, 16.7f, 16.2f)
-                path.cubicTo(15f, 12f, 14f, 8f, 12f, 3f)
-                path.close()
-                shape(canvas, true)
-                path.reset(); path.moveTo(8.3f, 13.4f); path.cubicTo(10.5f, 14.3f, 13.5f, 14.3f, 15.7f, 13.4f); shape(canvas, false)
-                path.reset(); path.moveTo(3.2f, 17f); path.cubicTo(6f, 19.8f, 18f, 19.8f, 20.8f, 17f); shape(canvas, false)
-            }
+            MenuIcon.HAT -> drawGhost(canvas, color)
             MenuIcon.GEAR -> {
                 path.reset()
                 for (i in 0 until 8) {
@@ -213,6 +237,32 @@ object MenuIcons {
     private fun shape(canvas: Canvas, withWash: Boolean) {
         if (withWash) canvas.drawPath(path, wash)
         canvas.drawPath(path, stroke)
+    }
+
+    private fun drawGhost(canvas: Canvas, color: Int) {
+        val saved = canvas.save()
+        canvas.scale(24f / 76f, 24f / 76f)
+        canvas.translate(-16f, -13f)
+
+        solid.color = color
+        hatWash.color = color
+        hatWash.alpha = (Color.alpha(color) * 0.55f).toInt()
+
+        stroke.strokeWidth = 5f
+        canvas.drawPath(GhostPaths.body, wash)
+        canvas.drawPath(GhostPaths.body, stroke)
+        canvas.drawPath(GhostPaths.eyes, solid)
+
+        stroke.strokeWidth = 4.4f
+        canvas.drawPath(GhostPaths.smile, stroke)
+
+        stroke.strokeWidth = 5f
+        canvas.drawPath(GhostPaths.brim, hatWash)
+        canvas.drawPath(GhostPaths.brim, stroke)
+        canvas.drawPath(GhostPaths.hatWithStar, hatWash)
+        canvas.drawPath(GhostPaths.hat, stroke)
+
+        canvas.restoreToCount(saved)
     }
 }
 

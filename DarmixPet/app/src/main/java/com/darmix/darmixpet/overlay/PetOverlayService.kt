@@ -50,7 +50,9 @@ import com.darmix.darmixpet.MainActivity
 import com.darmix.darmixpet.mascota.CharacterPhrases
 import android.content.res.Configuration
 import android.graphics.Rect
-import com.darmix.darmixpet.notifications.NotificationAccessHelper
+import com.darmix.darmixpet.notifications.MessageAlertApps
+import com.darmix.darmixpet.notifications.MessageArrival
+import com.darmix.darmixpet.tts.MessageAlertPreferences
 import com.darmix.darmixpet.notifications.NotificationRepository
 import com.darmix.darmixpet.notifications.PetNotification
 import com.darmix.darmixpet.notifications.NotificationLauncher
@@ -77,6 +79,7 @@ class PetOverlayService : LifecycleService() {
         private const val TAP_SUPPRESSION_WINDOW_MS = 500L
         private const val BATTERY_ALERT_REAPPEAR_INTERVAL_MS = 5 * 60_000L
         private const val TORCH_TOGGLE_COOLDOWN_MS = 1200L
+        private const val MESSAGE_ALERT_GROUP_MS = 2500L
 
         @Volatile private var userRequestedStop = false
 
@@ -135,6 +138,9 @@ class PetOverlayService : LifecycleService() {
     private var currentNotificationIndex = 0
 
     private val notificationGuard by lazy { NotificationListenerGuard(this, lifecycleScope) }
+
+    private val pendingArrivals = mutableListOf<MessageArrival>()
+    private var arrivalFlushJob: Job? = null
 
     private val tapTimestamps = mutableListOf<Long>()
     private var suppressTapCallbacksUntil = 0L
@@ -212,6 +218,7 @@ class PetOverlayService : LifecycleService() {
         startInstantGateListener()
         notificationGuard.start()
         startAuraListener()
+        startMessageAlertListener()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -238,6 +245,7 @@ class PetOverlayService : LifecycleService() {
         quickMenuStatusJob?.cancel()
         batteryAlertReappearJob?.cancel()
         notificationGuard.stop()
+        arrivalFlushJob?.cancel()
         ttsManager.shutdown()
         overlayView?.stopAnimation()
         overlayView?.let { windowManager.removeView(it) }
@@ -870,9 +878,9 @@ class PetOverlayService : LifecycleService() {
 
     private fun openConfigApp() {
         hideQuickMenu()
-        val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+            ?: Intent(this, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         startActivity(intent)
     }
 
@@ -1018,6 +1026,67 @@ class PetOverlayService : LifecycleService() {
     private fun startAuraListener() {
         lifecycleScope.launch {
             NotificationRepository.notifications.collect { updateAura() }
+        }
+    }
+
+    private fun startMessageAlertListener() {
+        lifecycleScope.launch {
+            NotificationRepository.arrivals.collect { onMessageArrival(it) }
+        }
+    }
+
+    private fun onMessageArrival(arrival: MessageArrival) {
+        if (!MessageAlertPreferences.isAppEnabled(this, arrival.packageName)) return
+        if (isScreenOn && lastForegroundPackage == arrival.packageName) return
+        pendingArrivals += arrival
+        if (arrivalFlushJob?.isActive == true) return
+        arrivalFlushJob = lifecycleScope.launch {
+            delay(MESSAGE_ALERT_GROUP_MS)
+            flushMessageArrivals()
+        }
+    }
+
+    private fun flushMessageArrivals() {
+        val batch = pendingArrivals.toList()
+        pendingArrivals.clear()
+        if (batch.isEmpty() || !canSpeakMessageAlert()) return
+        val text = buildMessageAlertText(batch, MessageAlertPreferences.includeSender(this)) ?: return
+        ttsManager.speak(text, interrupt = false)
+        if (isScreenOn && !isPanelOpen() && MessageAlertPreferences.showBubble(this)) showSpeechBubble(text)
+    }
+
+    private fun canSpeakMessageAlert(): Boolean {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return false
+        val mode = audioManager.mode
+        return mode != AudioManager.MODE_IN_CALL && mode != AudioManager.MODE_IN_COMMUNICATION
+    }
+
+    private fun buildMessageAlertText(batch: List<MessageArrival>, includeSender: Boolean): String? {
+        val byApp = batch.groupBy { it.packageName }
+            .mapNotNull { (pkg, items) -> MessageAlertApps.byPackage(pkg)?.let { it to items } }
+        if (byApp.isEmpty()) return null
+
+        if (byApp.size > 1) {
+            val labels = byApp.map { it.first.label }.distinct()
+            val joined = labels.dropLast(1).joinToString(", ") + " y " + labels.last()
+            return "¡Tienes mensajes nuevos de $joined!"
+        }
+
+        val (app, items) = byApp.first()
+        val count = items.size
+        val senders = items.mapNotNull { it.sender }.distinct()
+        val sender = if (includeSender && senders.size == 1) senders.first() else null
+
+        return when {
+            count == 1 && sender == null -> "¡Tienes ${app.singular}!"
+            count == 1 && app.isMail -> "¡Tienes un correo nuevo de $sender!"
+            count == 1 && app.isSms -> "¡Tienes un mensaje de texto de $sender!"
+            count == 1 -> "¡Tienes un mensaje de $sender en ${app.label}!"
+            sender == null -> "¡Tienes $count ${app.plural}!"
+            app.isMail -> "¡Tienes $count correos nuevos de $sender!"
+            app.isSms -> "¡Tienes $count mensajes de texto de $sender!"
+            else -> "¡Tienes $count mensajes de $sender en ${app.label}!"
         }
     }
 
