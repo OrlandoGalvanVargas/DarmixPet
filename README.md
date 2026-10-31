@@ -548,8 +548,8 @@ Abre un [**issue**](../../issues/new/choose) con:
 DarmixPet es un proyecto de **código cerrado y uso personal**. Todos los derechos reservados © 2026 Darmix.
 
 La descarga y el uso personal de la aplicación están permitidos. No se permite la redistribución, modificación o uso comercial sin autorización expresa del autor.
-
 Consulta el archivo [LICENSE](LICENSE) para ver los términos completos.
+
 ---
 
 ## 📜 Historial de versiones
