@@ -80,6 +80,77 @@ y este proyecto se adhiere a [Versionado Semántico](https://semver.org/lang/es/
 
 ---
 
+## [1.2.3] — 2026-10-??
+
+**Enlace a la web oficial.**
+
+### Añadido
+
+- Enlace **"Ir a la web"** en el diálogo de actualización, que lleva a la página oficial por si la descarga del APK falla o hay problemas al instalarlo desde el navegador.
+
+### Cambiado
+
+- El enlace reemplaza el texto anterior, que solo mencionaba la descarga del APK.
+
+### Notas
+
+- Actualización pequeña: se instala encima de la versión anterior sin perder nada.
+
+---
+
+## [1.2.2] — 2026-10-??
+
+**Nuevo ícono.**
+
+### Cambiado
+
+- Nuevo ícono de la aplicación en la pantalla de inicio y en el menú de apps recientes, más limpio y con la esencia del sombrero de Archi.
+- Ajustes de proporción y nitidez para que se vea bien en todas las densidades de pantalla.
+- Se adapta automáticamente a los launchers con íconos redondeados.
+
+### Notas
+
+- Actualización visual: no cambia la vigilancia de tus apps ni tus personajes, y se instala encima de la versión anterior sin perder nada.
+
+---
+
+## [1.2.1] — 2026-10-??
+
+**Comprobación más rápida.**
+
+### Cambiado
+
+- El intervalo de búsqueda de actualizaciones se reduce de 6 horas a 30 minutos: al abrir la app, si pasaron 30 minutos o más desde la última revisión, consulta sola.
+
+### Corregido
+
+- Las consultas evitan la caché de GitHub y llevan una marca de tiempo, para leer siempre la información más reciente.
+
+### Notas
+
+- Actualización pequeña: se instala encima de la versión anterior sin perder nada.
+
+---
+
+## [1.2.0] — 2026-10-??
+
+**Aviso de actualizaciones.**
+
+### Añadido
+
+- Búsqueda automática de versiones nuevas en las releases del repositorio, de forma discreta.
+- Aviso al abrir la app cuando hay una versión nueva, con sus novedades y un botón para descargarla.
+- Indicador en Ajustes con el estado de las actualizaciones y opción **"Revisar"** para comprobarlo manualmente.
+- La tarjeta "Acerca de" se resalta cuando hay algo nuevo y se puede tocar para ver los detalles.
+- Botón **"Reintentar"** si falla la conexión, y reintento automático cuando vuelve internet.
+
+### Notas
+
+- La comprobación solo lee el número de versión y las notas públicas de cada release: no envía nada tuyo ni te identifica.
+- Se instala encima de la versión anterior sin perder nada.
+
+---
+
 ## [1.1.0] — 2026-10-06
 
 ### Añadido
