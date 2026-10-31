@@ -7,10 +7,6 @@
 
 <img src="docs/icon.png" alt="DarmixPet" width="150" />
 
-# DarmixPet
-
-### Tu compañero de tiempo de pantalla
-
 Una mascota mágica que flota sobre tus apps, cuida tu atención,
 te avisa de lo importante y te recuerda que la vida también pasa fuera de la pantalla.
 
