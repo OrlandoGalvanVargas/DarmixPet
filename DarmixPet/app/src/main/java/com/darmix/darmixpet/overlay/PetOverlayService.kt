@@ -1,85 +1,57 @@
 package com.darmix.darmixpet.overlay
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.graphics.PixelFormat
-import android.media.AudioManager
-import android.net.Uri
-import android.os.Build
+import android.graphics.Rect
 import android.os.PowerManager
-import android.provider.AlarmClock
-import android.provider.Settings
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
-import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.getSystemService
-import com.darmix.darmixpet.R
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
+import com.darmix.darmixpet.mascota.CharacterPhrases
 import com.darmix.darmixpet.mascota.ConfigurableSkin
 import com.darmix.darmixpet.mascota.MascotaAnimState
 import com.darmix.darmixpet.mascota.MascotaSkin
 import com.darmix.darmixpet.mascota.SkinInfo
 import com.darmix.darmixpet.mascota.SkinPreferences
 import com.darmix.darmixpet.mascota.SkinRegistry
-import android.view.View
-import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import com.darmix.darmixpet.data.AppDatabase
-import com.darmix.darmixpet.monitor.ForegroundAppSignal
-import com.darmix.darmixpet.monitor.ForegroundAppTracker
-import android.util.Log
-import com.darmix.darmixpet.data.MonitoredAppDao
-import com.darmix.darmixpet.data.MonitoredAppEntity
-import java.util.Calendar
-import com.darmix.darmixpet.tts.TtsManager
-import android.view.GestureDetector
 import com.darmix.darmixpet.monitor.ContextualStateChecker
-import com.darmix.darmixpet.MainActivity
-import com.darmix.darmixpet.mascota.CharacterPhrases
-import android.content.res.Configuration
-import android.graphics.Rect
-import com.darmix.darmixpet.notifications.MessageAlertApps
-import com.darmix.darmixpet.notifications.MessageArrival
-import com.darmix.darmixpet.tts.MessageAlertPreferences
-import com.darmix.darmixpet.notifications.NotificationRepository
-import com.darmix.darmixpet.notifications.PetNotification
+import com.darmix.darmixpet.monitor.ForegroundAppTracker
 import com.darmix.darmixpet.notifications.NotificationLauncher
 import com.darmix.darmixpet.notifications.NotificationListenerGuard
+import com.darmix.darmixpet.notifications.NotificationRepository
+import com.darmix.darmixpet.notifications.PetNotification
+import com.darmix.darmixpet.tts.TtsManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class PetOverlayService : LifecycleService() {
 
     companion object {
-        private const val CHANNEL_ID = "pet_overlay_channel"
-        private const val NOTIFICATION_ID = 1001
         private const val PET_SIZE_DP = 70
-        private const val FOREGROUND_POLL_INTERVAL_MS = 1000L
         private const val CONTEXTUAL_CHECK_INTERVAL_MS = 5_000L
-        private const val DAILY_RESET_CHECK_INTERVAL_MS = 60_000L
         private const val BLOCK_OVERLAY_DISMISS_DELAY_MS = 1300L
         private const val BLOCK_DEBOUNCE_MS = 2000L
         private const val BUBBLE_FADE_MS = 250L
         private const val BUBBLE_VISIBLE_MS = 1500L
         private const val TAIL_CLEARANCE_DP = 12
         private const val ROTATION_SETTLE_MS = 300L
-        private const val TIMER_APP_PACKAGE = "com.darmix.tiempomio"
         private const val STATUS_REFRESH_INTERVAL_MS = 1000L
         private const val TRIPLE_TAP_WINDOW_MS = 600L
         private const val TAP_SUPPRESSION_WINDOW_MS = 500L
         private const val BATTERY_ALERT_REAPPEAR_INTERVAL_MS = 5 * 60_000L
         private const val TORCH_TOGGLE_COOLDOWN_MS = 1200L
-        private const val MESSAGE_ALERT_GROUP_MS = 2500L
 
         @Volatile private var userRequestedStop = false
 
@@ -103,6 +75,9 @@ class PetOverlayService : LifecycleService() {
     private lateinit var layoutParams: WindowManager.LayoutParams
     private lateinit var ttsManager: TtsManager
     private lateinit var foregroundTracker: ForegroundAppTracker
+    private lateinit var usageMonitor: AppUsageMonitor
+    private lateinit var messageAlerts: MessageAlertCoordinator
+    private lateinit var deviceControls: DeviceControls
     private var petSizePx = 0
 
     private val overlayArea = Rect()
@@ -113,8 +88,6 @@ class PetOverlayService : LifecycleService() {
 
     @Volatile private var isScreenOn = true
     private var screenReceiverRegistered = false
-
-    @Volatile private var lastForegroundPackage: String? = null
 
     private var currentBaseState: MascotaAnimState = MascotaAnimState.IDLE
     private var nightWarningSpoken = false
@@ -139,9 +112,6 @@ class PetOverlayService : LifecycleService() {
 
     private val notificationGuard by lazy { NotificationListenerGuard(this, lifecycleScope) }
 
-    private val pendingArrivals = mutableListOf<MessageArrival>()
-    private var arrivalFlushJob: Job? = null
-
     private val tapTimestamps = mutableListOf<Long>()
     private var suppressTapCallbacksUntil = 0L
 
@@ -160,6 +130,7 @@ class PetOverlayService : LifecycleService() {
             val stateToShow = if (isPanelOpen()) MascotaAnimState.THINKING else currentBaseState
             overlayView?.playSpriteSheet(skin.getAnimation(this, stateToShow), loop = true)
             applyThemeToViews()
+            PetForegroundNotification.refresh(this, currentSkinInfo.id)
         }
     }
 
@@ -185,17 +156,36 @@ class PetOverlayService : LifecycleService() {
         currentSkinInfo = SkinRegistry.byId(SkinPreferences.getSelectedSkinId(this))
         skin = ConfigurableSkin(currentSkinInfo)
 
-        createNotificationChannel()
-        startForegroundNotification()
+        PetForegroundNotification.start(this, currentSkinInfo.id)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         currentBaseState = computeDesiredBaseState()
         flashlight = FlashlightController(this)
+        deviceControls = DeviceControls(this)
         addAuraView()
         addOverlayView()
 
         ttsManager = TtsManager(this)
         foregroundTracker = ForegroundAppTracker(this)
+        usageMonitor = AppUsageMonitor(
+            context = this,
+            scope = lifecycleScope,
+            tracker = foregroundTracker,
+            isScreenOn = { isScreenOn },
+            speak = { ttsManager.speak(it) },
+            onBlock = { blockAndRedirectHome(it) },
+            onAppSwitched = {
+                if (quickMenuView != null) hideQuickMenu()
+                if (notificationPanelView != null) hideNotificationPanel()
+            }
+        )
+        messageAlerts = MessageAlertCoordinator(
+            context = this,
+            scope = lifecycleScope,
+            isAppInFront = { isScreenOn && usageMonitor.lastForegroundPackage == it },
+            speak = { ttsManager.speak(it, interrupt = false) },
+            showBubble = { if (isScreenOn && !isPanelOpen()) showSpeechBubble(it) }
+        )
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         isScreenOn = powerManager.isInteractive
@@ -212,13 +202,11 @@ class PetOverlayService : LifecycleService() {
             showBatteryAlert()
         }
 
-        startMonitoringLoop()
+        usageMonitor.start()
         startContextualStateLoop()
-        startDailyResetWatcherLoop()
-        startInstantGateListener()
         notificationGuard.start()
         startAuraListener()
-        startMessageAlertListener()
+        messageAlerts.start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -245,7 +233,7 @@ class PetOverlayService : LifecycleService() {
         quickMenuStatusJob?.cancel()
         batteryAlertReappearJob?.cancel()
         notificationGuard.stop()
-        arrivalFlushJob?.cancel()
+        if (::messageAlerts.isInitialized) messageAlerts.stop()
         ttsManager.shutdown()
         overlayView?.stopAnimation()
         overlayView?.let { windowManager.removeView(it) }
@@ -276,119 +264,6 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-
-
-    private fun startInstantGateListener() {
-        lifecycleScope.launch {
-            val dao = AppDatabase.getInstance(this@PetOverlayService).monitoredAppDao()
-            ForegroundAppSignal.events.collect { packageName ->
-                if (quickMenuView != null) hideQuickMenu()
-                if (notificationPanelView != null) hideNotificationPanel()
-                lastForegroundPackage = packageName
-                instantGateCheck(dao, packageName)
-            }
-        }
-    }
-
-    private suspend fun instantGateCheck(dao: MonitoredAppDao, packageName: String) {
-        val app = dao.getByPackageName(packageName) ?: return
-        val now = System.currentTimeMillis()
-        val current = applyDailyResetIfNeeded(app, now)
-        if (current != app) dao.update(current)
-
-        val cooldownMillis = current.cooldownMinutes * 60_000L
-        val inCooldown = current.lastBlockedTimestamp != 0L &&
-                (now - current.lastBlockedTimestamp) < cooldownMillis
-
-        if (inCooldown) {
-            blockAndRedirectHome("Todavía estás en tiempo de descanso ⏳")
-            return
-        }
-        if (current.sessionsUsedToday >= current.maxSessionsPerDay) {
-            blockAndRedirectHome("Ya usaste todas tus sesiones de hoy 🚫")
-        }
-    }
-
-
-
-    private fun startMonitoringLoop() {
-        lifecycleScope.launch {
-            val dao = AppDatabase.getInstance(this@PetOverlayService).monitoredAppDao()
-            while (true) {
-                if (isScreenOn) {
-                    val foregroundPackage = foregroundTracker.poll()
-                    if (foregroundPackage != null) {
-                        lastForegroundPackage = foregroundPackage
-                        val monitoredApp = dao.getByPackageName(foregroundPackage)
-                        if (monitoredApp != null) handleMonitoredApp(dao, monitoredApp)
-                    }
-                }
-                delay(FOREGROUND_POLL_INTERVAL_MS)
-            }
-        }
-    }
-
-    private fun applyDailyResetIfNeeded(app: MonitoredAppEntity, now: Long): MonitoredAppEntity {
-        return if (!isSameDay(app.lastUsageResetTimestamp, now)) {
-            app.copy(
-                sessionsUsedToday = 0,
-                usedInSessionMillis = 0L,
-                halfwayAlertGiven = false,
-                lastUsageResetTimestamp = now
-            )
-        } else app
-    }
-
-    private suspend fun handleMonitoredApp(dao: MonitoredAppDao, app: MonitoredAppEntity) {
-        val now = System.currentTimeMillis()
-        val current = applyDailyResetIfNeeded(app, now)
-
-        val cooldownMillis = current.cooldownMinutes * 60_000L
-        val inCooldown = current.lastBlockedTimestamp != 0L &&
-                (now - current.lastBlockedTimestamp) < cooldownMillis
-
-        if (inCooldown) {
-            if (current != app) dao.update(current)
-            blockAndRedirectHome("Todavía estás en tiempo de descanso ⏳")
-            return
-        }
-        if (current.sessionsUsedToday >= current.maxSessionsPerDay) {
-            if (current != app) dao.update(current)
-            blockAndRedirectHome("Ya usaste todas tus sesiones de hoy 🚫")
-            return
-        }
-
-        val sessionLimitMillis = current.sessionLimitMinutes * 60_000L
-        var updated = current.copy(usedInSessionMillis = current.usedInSessionMillis + FOREGROUND_POLL_INTERVAL_MS)
-
-        if (!updated.halfwayAlertGiven && updated.usedInSessionMillis >= sessionLimitMillis / 2) {
-            ttsManager.speak("Vas a la mitad de tu tiempo en ${updated.appName}")
-            updated = updated.copy(halfwayAlertGiven = true)
-        }
-
-        if (updated.usedInSessionMillis >= sessionLimitMillis) {
-            val blocked = updated.copy(
-                usedInSessionMillis = 0L,
-                halfwayAlertGiven = false,
-                sessionsUsedToday = updated.sessionsUsedToday + 1,
-                lastBlockedTimestamp = now
-            )
-            ttsManager.speak("Se acabó tu tiempo en ${blocked.appName}")
-            dao.update(blocked)
-            blockAndRedirectHome("Se acabó tu tiempo ⏰")
-        } else {
-            dao.update(updated)
-        }
-    }
-
-    private fun isSameDay(t1: Long, t2: Long): Boolean {
-        if (t1 == 0L) return false
-        val cal1 = Calendar.getInstance().apply { timeInMillis = t1 }
-        val cal2 = Calendar.getInstance().apply { timeInMillis = t2 }
-        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-    }
-
     private fun sendToHome() {
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
@@ -396,32 +271,6 @@ class PetOverlayService : LifecycleService() {
         }
         startActivity(homeIntent)
     }
-
-
-
-    private fun startDailyResetWatcherLoop() {
-        lifecycleScope.launch {
-            val dao = AppDatabase.getInstance(this@PetOverlayService).monitoredAppDao()
-            while (true) {
-                val now = System.currentTimeMillis()
-                dao.getAllMonitoredAppsOnce().forEach { app ->
-                    if (app.lastUsageResetTimestamp != 0L && !isSameDay(app.lastUsageResetTimestamp, now)) {
-                        dao.update(
-                            app.copy(
-                                sessionsUsedToday = 0,
-                                usedInSessionMillis = 0L,
-                                halfwayAlertGiven = false,
-                                lastUsageResetTimestamp = now
-                            )
-                        )
-                    }
-                }
-                delay(DAILY_RESET_CHECK_INTERVAL_MS)
-            }
-        }
-    }
-
-
 
     private fun blockAndRedirectHome(message: String) {
         val now = System.currentTimeMillis()
@@ -463,8 +312,6 @@ class PetOverlayService : LifecycleService() {
             runCatching { windowManager.removeView(view) }
         }
     }
-
-
 
     private fun ensureSpeechBubble(): SpeechBubbleView {
         speechBubbleView?.let { return it }
@@ -571,7 +418,10 @@ class PetOverlayService : LifecycleService() {
         windowManager.updateViewLayout(bubble, speechBubbleParams)
     }
 
-
+    private fun hideSpeechBubbleNow() {
+        bubbleJob?.cancel()
+        speechBubbleView?.let { if (it.alpha > 0f) it.popOut(BUBBLE_FADE_MS) }
+    }
 
     private fun ensureBatteryAlertView(): BatteryAlertView {
         batteryAlertView?.let { return it }
@@ -639,8 +489,6 @@ class PetOverlayService : LifecycleService() {
         batteryAlertView = null
     }
 
-
-
     private fun ensureQuickMenu(): QuickMenuView {
         quickMenuView?.let { return it }
         val menu = QuickMenuView(this).apply {
@@ -674,18 +522,28 @@ class PetOverlayService : LifecycleService() {
 
         overlayView?.playSpriteSheet(skin.getAnimation(this, MascotaAnimState.THINKING), loop = true)
 
-        menu.configureStatusPage("Cargando…") { openTimerApp() }
-        menu.configureBrightnessPage(getCurrentBrightnessPercent()) { percent -> setBrightnessPercent(percent) }
-        menu.configureVolumePage(getCurrentVolumePercent()) { percent -> setVolumePercent(percent) }
+        menu.configureStatusPage("Cargando…") {
+            hideQuickMenu()
+            deviceControls.openTimerApp()
+        }
+        menu.configureBrightnessPage(deviceControls.brightnessPercent()) { percent ->
+            deviceControls.setBrightnessPercent(percent)
+        }
+        menu.configureVolumePage(deviceControls.volumePercent()) { percent ->
+            deviceControls.setVolumePercent(percent)
+        }
         menu.configureSleepPage { PetController.sleep(this@PetOverlayService) }
-        menu.configureConfigButton { openConfigApp() }
+        menu.configureConfigButton {
+            hideQuickMenu()
+            deviceControls.openDarmixPet()
+        }
         refreshSkinMenuPage(menu)
         repositionQuickMenu(menu)
 
         quickMenuStatusJob?.cancel()
         quickMenuStatusJob = lifecycleScope.launch {
             while (true) {
-                menu.setStatusText(buildQuickMenuStatusText())
+                menu.setStatusText(usageMonitor.statusText())
                 repositionQuickMenu(menu)
                 delay(STATUS_REFRESH_INTERVAL_MS)
             }
@@ -701,12 +559,27 @@ class PetOverlayService : LifecycleService() {
         updateAura()
     }
 
-    private fun isPanelOpen(): Boolean = quickMenuView != null || notificationPanelView != null
-
-    private fun hideSpeechBubbleNow() {
-        bubbleJob?.cancel()
-        speechBubbleView?.let { if (it.alpha > 0f) it.popOut(BUBBLE_FADE_MS) }
+    private fun refreshSkinMenuPage(menu: QuickMenuView) {
+        val previewFrame = skin.getAnimation(this, MascotaAnimState.IDLE).frames.firstOrNull()
+        menu.configureSkinPage(
+            name = skin.displayName,
+            previewFrame = previewFrame,
+            onPrev = { cycleSkin(-1, menu) },
+            onNext = { cycleSkin(1, menu) }
+        )
     }
+
+    private fun cycleSkin(direction: Int, menu: QuickMenuView) {
+        val skins = SkinRegistry.availableSkins
+        if (skins.isEmpty()) return
+        val currentIndex = skins.indexOfFirst { it.id == skin.id }.coerceAtLeast(0)
+        val nextIndex = (currentIndex + direction + skins.size) % skins.size
+        SkinPreferences.setSelectedSkinId(this, skins[nextIndex].id)
+        refreshSkinMenuPage(menu)
+        repositionQuickMenu(menu)
+    }
+
+    private fun isPanelOpen(): Boolean = quickMenuView != null || notificationPanelView != null
 
     private fun ensureNotificationPanel(): NotificationPanelView {
         notificationPanelView?.let { return it }
@@ -797,6 +670,15 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
+    private fun openCurrentNotification() {
+        val key = currentNotificationKey ?: return
+        val item = NotificationRepository.notifications.value.firstOrNull { it.key == key } ?: return
+        hideNotificationPanel()
+        if (!NotificationLauncher.open(this, item)) {
+            Toast.makeText(this, "No pude abrir esta notificación", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun hideNotificationPanel() {
         notificationPanelJob?.cancel()
         notificationPanelJob = null
@@ -806,136 +688,6 @@ class PetOverlayService : LifecycleService() {
         overlayView?.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
         updateAura()
     }
-
-    private fun refreshSkinMenuPage(menu: QuickMenuView) {
-        val previewFrame = skin.getAnimation(this, MascotaAnimState.IDLE).frames.firstOrNull()
-        menu.configureSkinPage(
-            name = skin.displayName,
-            previewFrame = previewFrame,
-            onPrev = { cycleSkin(-1, menu) },
-            onNext = { cycleSkin(1, menu) }
-        )
-    }
-
-    private fun cycleSkin(direction: Int, menu: QuickMenuView) {
-        val skins = SkinRegistry.availableSkins
-        if (skins.isEmpty()) return
-        val currentIndex = skins.indexOfFirst { it.id == skin.id }.coerceAtLeast(0)
-        val nextIndex = (currentIndex + direction + skins.size) % skins.size
-        SkinPreferences.setSelectedSkinId(this, skins[nextIndex].id)
-        refreshSkinMenuPage(menu)
-        repositionQuickMenu(menu)
-    }
-
-    private suspend fun buildQuickMenuStatusText(): String {
-        val packageName = lastForegroundPackage ?: return "No hay ninguna app monitoreada abierta"
-        val dao = AppDatabase.getInstance(this).monitoredAppDao()
-        val app = dao.getByPackageName(packageName) ?: return "No hay ninguna app monitoreada abierta"
-
-        val now = System.currentTimeMillis()
-        val current = applyDailyResetIfNeeded(app, now)
-
-        val cooldownMillis = current.cooldownMinutes * 60_000L
-        val inCooldown = current.lastBlockedTimestamp != 0L &&
-                (now - current.lastBlockedTimestamp) < cooldownMillis
-
-        if (inCooldown) {
-            val remainingMs = cooldownMillis - (now - current.lastBlockedTimestamp)
-            return "${current.appName}\nEn enfriamiento: ${formatDuration(remainingMs)} restantes"
-        }
-        if (current.sessionsUsedToday >= current.maxSessionsPerDay) {
-            return "${current.appName}\nSesiones agotadas por hoy"
-        }
-        val sessionLimitMillis = current.sessionLimitMinutes * 60_000L
-        val remainingMs = (sessionLimitMillis - current.usedInSessionMillis).coerceAtLeast(0L)
-        return "${current.appName}\nRestante: ${formatDuration(remainingMs)}"
-    }
-
-    private fun formatDuration(millis: Long): String {
-        val totalSeconds = millis / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return if (minutes > 0) "${minutes} min ${seconds}s" else "${seconds}s"
-    }
-
-    private fun openTimerApp() {
-        hideQuickMenu()
-        val launchIntent = packageManager.getLaunchIntentForPackage(TIMER_APP_PACKAGE)
-        if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(launchIntent)
-            return
-        }
-        try {
-            val systemTimerIntent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(systemTimerIntent)
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(this, "No se encontró ninguna app de temporizador", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openConfigApp() {
-        hideQuickMenu()
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent(this, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        startActivity(intent)
-    }
-
-
-
-    private fun getCurrentBrightnessPercent(): Int {
-        return try {
-            val value = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS)
-            (value * 100 / 255).coerceIn(0, 100)
-        } catch (e: Settings.SettingNotFoundException) {
-            50
-        }
-    }
-
-    private fun setBrightnessPercent(percent: Int) {
-        if (!Settings.System.canWrite(this)) {
-            Toast.makeText(this, "Activa el permiso para modificar ajustes del sistema", Toast.LENGTH_SHORT).show()
-            val intent = Intent(
-                Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                Uri.parse("package:$packageName")
-            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-            startActivity(intent)
-            return
-        }
-        try {
-            Settings.System.putInt(
-                contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
-            )
-            val value = (percent * 255 / 100).coerceIn(0, 255)
-            Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, value)
-        } catch (e: SecurityException) {
-            Log.w("PetOverlayService", "No se pudo cambiar el brillo", e)
-        }
-    }
-
-
-
-    private fun getCurrentVolumePercent(): Int {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        if (max == 0) return 0
-        val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        return (current * 100 / max).coerceIn(0, 100)
-    }
-
-    private fun setVolumePercent(percent: Int) {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val value = (percent * max / 100).coerceIn(0, max)
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, value, 0)
-    }
-
-
 
     private fun startContextualStateLoop() {
         lifecycleScope.launch {
@@ -1029,74 +781,13 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    private fun startMessageAlertListener() {
-        lifecycleScope.launch {
-            NotificationRepository.arrivals.collect { onMessageArrival(it) }
-        }
-    }
-
-    private fun onMessageArrival(arrival: MessageArrival) {
-        if (!MessageAlertPreferences.isAppEnabled(this, arrival.packageName)) return
-        if (isScreenOn && lastForegroundPackage == arrival.packageName) return
-        pendingArrivals += arrival
-        if (arrivalFlushJob?.isActive == true) return
-        arrivalFlushJob = lifecycleScope.launch {
-            delay(MESSAGE_ALERT_GROUP_MS)
-            flushMessageArrivals()
-        }
-    }
-
-    private fun flushMessageArrivals() {
-        val batch = pendingArrivals.toList()
-        pendingArrivals.clear()
-        if (batch.isEmpty() || !canSpeakMessageAlert()) return
-        val text = buildMessageAlertText(batch, MessageAlertPreferences.includeSender(this)) ?: return
-        ttsManager.speak(text, interrupt = false)
-        if (isScreenOn && !isPanelOpen() && MessageAlertPreferences.showBubble(this)) showSpeechBubble(text)
-    }
-
-    private fun canSpeakMessageAlert(): Boolean {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return false
-        val mode = audioManager.mode
-        return mode != AudioManager.MODE_IN_CALL && mode != AudioManager.MODE_IN_COMMUNICATION
-    }
-
-    private fun buildMessageAlertText(batch: List<MessageArrival>, includeSender: Boolean): String? {
-        val byApp = batch.groupBy { it.packageName }
-            .mapNotNull { (pkg, items) -> MessageAlertApps.byPackage(pkg)?.let { it to items } }
-        if (byApp.isEmpty()) return null
-
-        if (byApp.size > 1) {
-            val labels = byApp.map { it.first.label }.distinct()
-            val joined = labels.dropLast(1).joinToString(", ") + " y " + labels.last()
-            return "¡Tienes mensajes nuevos de $joined!"
-        }
-
-        val (app, items) = byApp.first()
-        val count = items.size
-        val senders = items.mapNotNull { it.sender }.distinct()
-        val sender = if (includeSender && senders.size == 1) senders.first() else null
-
-        return when {
-            count == 1 && sender == null -> "¡Tienes ${app.singular}!"
-            count == 1 && app.isMail -> "¡Tienes un correo nuevo de $sender!"
-            count == 1 && app.isSms -> "¡Tienes un mensaje de texto de $sender!"
-            count == 1 -> "¡Tienes un mensaje de $sender en ${app.label}!"
-            sender == null -> "¡Tienes $count ${app.plural}!"
-            app.isMail -> "¡Tienes $count correos nuevos de $sender!"
-            app.isSms -> "¡Tienes $count mensajes de texto de $sender!"
-            else -> "¡Tienes $count mensajes de $sender en ${app.label}!"
-        }
-    }
-
     private fun addOverlayView() {
         val sizePx = (PET_SIZE_DP * resources.displayMetrics.density).toInt()
         petSizePx = sizePx
-        val overlayType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         layoutParams = WindowManager.LayoutParams(
-            sizePx, sizePx, overlayType,
+            sizePx, sizePx,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -1188,30 +879,6 @@ class PetOverlayService : LifecycleService() {
         }
     }
 
-    private fun startForegroundNotification() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("DarmixPet activo")
-            .setContentText("Archi está vigilando tu tiempo de pantalla")
-            .setSmallIcon(R.drawable.ic_stat_darmixpet)
-            .setOngoing(true)
-            .build()
-
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
-            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-        )
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "DarmixPet Overlay", NotificationManager.IMPORTANCE_LOW)
-            val manager = getSystemService<NotificationManager>()
-            manager?.createNotificationChannel(channel)
-        }
-    }
-
     private fun toggleFlashlight() {
         val now = System.currentTimeMillis()
         if (now - lastTorchToggleAt < TORCH_TOGGLE_COOLDOWN_MS) return
@@ -1223,14 +890,5 @@ class PetOverlayService : LifecycleService() {
             FlashlightController.Result.IN_USE -> "La cámara está en uso, no puedo encender la luz"
         }
         showSpeechBubble(message)
-    }
-
-    private fun openCurrentNotification() {
-        val key = currentNotificationKey ?: return
-        val item = NotificationRepository.notifications.value.firstOrNull { it.key == key } ?: return
-        hideNotificationPanel()
-        if (!NotificationLauncher.open(this, item)) {
-            Toast.makeText(this, "No pude abrir esta notificación", Toast.LENGTH_SHORT).show()
-        }
     }
 }

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -28,6 +29,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,7 +100,8 @@ private data class PermItem(
     val why: String,
     val granted: Boolean,
     val actionLabel: String = "Activar",
-    val badge: String? = null
+    val badge: String? = null,
+    val reopenable: Boolean = false
 )
 
 private enum class NoteKind { TIP, WARNING }
@@ -131,6 +134,14 @@ private object PermissionIntents {
         Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")
     )
 
+    fun freshTask(intent: Intent): Intent = intent.addFlags(
+        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    )
+
+    fun restrictedAppDetails(context: Context) = freshTask(appDetails(context))
+
+    fun restrictedTrigger() = freshTask(AccessibilityPermissionHelper.buildPermissionIntent())
+
     fun appNotifications(context: Context) = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
 
@@ -147,7 +158,6 @@ private fun safeStart(context: Context, vararg intents: Intent?) {
             context.startActivity(intent)
             return
         } catch (e: Exception) {
-            // Esta pantalla no existe en este teléfono: probamos la siguiente
         }
     }
     Toast.makeText(context, "No pude abrir los ajustes. Ábrelos manualmente.", Toast.LENGTH_LONG).show()
@@ -181,7 +191,16 @@ private fun isInstalledFromTrustedStore(context: Context): Boolean {
     } catch (e: Exception) {
         null
     }
-    return installer in TRUSTED_STORES
+    if (installer in TRUSTED_STORES) return true
+    if (Build.VERSION.SDK_INT >= 33) {
+        val source = try {
+            context.packageManager.getInstallSourceInfo(context.packageName).packageSource
+        } catch (e: Exception) {
+            PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED
+        }
+        if (source == PackageInstaller.PACKAGE_SOURCE_STORE) return true
+    }
+    return false
 }
 
 
@@ -368,19 +387,19 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     var hasNotificationAccess by remember { mutableStateOf(NotificationAccessHelper.isNotificationAccessGranted(context)) }
 
     var restrictedDone by remember { mutableStateOf(RestrictedStepPrefs.isDone(context)) }
-    var restrictedOpened by rememberSaveable { mutableStateOf(false) }
+    var restrictedNoticeTried by rememberSaveable { mutableStateOf(false) }
+    var restrictedAwaitingReturn by rememberSaveable { mutableStateOf(false) }
     var notifBlocked by remember { mutableStateOf(false) }
     var openGuide by remember { mutableStateOf<PermKey?>(null) }
 
     val fromStore = remember { isInstalledFromTrustedStore(context) }
     val restrictedPossible = Build.VERSION.SDK_INT >= 33 && !fromStore
 
-    val restrictedProven = hasAccessibility || hasNotificationAccess ||
-            (Build.VERSION.SDK_INT >= 35 && hasUsageStats)
+    val restrictedProven = hasAccessibility || hasNotificationAccess
     val restrictedGranted = restrictedDone || restrictedProven
-    val restrictedVisible = restrictedPossible &&
-            !(hasUsageStats && hasAccessibility && hasNotificationAccess)
+    val restrictedVisible = restrictedPossible && !(hasAccessibility && hasNotificationAccess)
     val restrictedNeeded = restrictedVisible && !restrictedGranted
+    val restrictedWarn = restrictedPossible && !restrictedProven
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -402,6 +421,11 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                 hasNotificationAccess = NotificationAccessHelper.isNotificationAccessGranted(context)
                 restrictedDone = RestrictedStepPrefs.isDone(context)
                 if (hasNotifications) notifBlocked = false
+                if (restrictedAwaitingReturn) {
+                    restrictedAwaitingReturn = false
+                    val proven = hasAccessibility || hasNotificationAccess
+                    if (!proven && !restrictedDone) openGuide = PermKey.RESTRICTED
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -424,12 +448,23 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         }
     }
 
+    fun showRestrictedNotice() {
+        restrictedNoticeTried = true
+        restrictedAwaitingReturn = true
+        safeStart(context, PermissionIntents.restrictedTrigger())
+    }
+
+    fun openRestrictedAppInfo() {
+        restrictedAwaitingReturn = true
+        safeStart(context, PermissionIntents.restrictedAppDetails(context))
+    }
+
     fun launchFor(key: PermKey) {
+        if (restrictedNeeded && (key == PermKey.ACCESSIBILITY || key == PermKey.NOTIFICATION_ACCESS)) {
+            restrictedNoticeTried = true
+        }
         when (key) {
-            PermKey.RESTRICTED -> {
-                restrictedOpened = true
-                safeStart(context, PermissionIntents.appDetails(context))
-            }
+            PermKey.RESTRICTED -> openRestrictedAppInfo()
             PermKey.OVERLAY -> safeStart(context, OverlayPermissionHelper.buildPermissionIntent(context))
             PermKey.USAGE -> safeStart(
                 context, PermissionIntents.usageAccess(context), UsageStatsPermissionHelper.buildPermissionIntent()
@@ -449,6 +484,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     fun markRestrictedDone() {
         RestrictedStepPrefs.setDone(context)
         restrictedDone = true
+        restrictedAwaitingReturn = false
     }
 
     val restrictedItem = PermItem(
@@ -457,8 +493,8 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         title = "Permitir ajustes restringidos",
         why = "Android bloquea algunos permisos en apps instaladas fuera de la tienda. Esto los desbloquea.",
         granted = restrictedGranted,
-        actionLabel = if (restrictedOpened) "Ya lo hice" else "Activar",
-        badge = "Paso previo"
+        badge = "Paso previo",
+        reopenable = restrictedDone && !restrictedProven
     )
 
     val items = listOf(
@@ -521,9 +557,7 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                     item = restrictedItem,
                     index = index++,
                     highlight = firstPending == PermKey.RESTRICTED,
-                    onActivate = {
-                        if (restrictedOpened) markRestrictedDone() else openGuide = PermKey.RESTRICTED
-                    }
+                    onActivate = { openGuide = PermKey.RESTRICTED }
                 )
                 Spacer(Modifier.height(14.dp))
             }
@@ -540,20 +574,43 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     }
 
     openGuide?.let { key ->
-        val guide = buildGuide(key, restrictedNeeded, notifBlocked, petName)
-        PermissionGuideDialog(
-            guide = guide,
-            onDismiss = { openGuide = null },
-            onPrimary = {
-                openGuide = null
-                launchFor(key)
-            },
-            onSecondary = if (key == PermKey.RESTRICTED) {
-                { markRestrictedDone(); openGuide = null }
-            } else null
-        )
+        val guide = buildGuide(key, restrictedWarn, notifBlocked, petName)
+        if (key == PermKey.RESTRICTED) {
+            val noticeFirst = !restrictedNoticeTried
+            PermissionGuideDialog(
+                guide = guide.copy(
+                    primaryLabel = if (noticeFirst) RESTRICTED_NOTICE_LABEL else guide.primaryLabel
+                ),
+                onDismiss = { openGuide = null },
+                onPrimary = {
+                    openGuide = null
+                    if (noticeFirst) showRestrictedNotice() else openRestrictedAppInfo()
+                },
+                onSecondary = {
+                    markRestrictedDone()
+                    openGuide = null
+                },
+                tertiaryLabel = if (noticeFirst) guide.primaryLabel else RESTRICTED_NOTICE_LABEL,
+                onTertiary = {
+                    openGuide = null
+                    if (noticeFirst) openRestrictedAppInfo() else showRestrictedNotice()
+                }
+            )
+        } else {
+            PermissionGuideDialog(
+                guide = guide,
+                onDismiss = { openGuide = null },
+                onPrimary = {
+                    openGuide = null
+                    launchFor(key)
+                },
+                onSecondary = null
+            )
+        }
     }
 }
+
+private const val RESTRICTED_NOTICE_LABEL = "Mostrar el aviso"
 
 
 
@@ -562,7 +619,9 @@ private fun PermissionGuideDialog(
     guide: PermGuide,
     onDismiss: () -> Unit,
     onPrimary: () -> Unit,
-    onSecondary: (() -> Unit)?
+    onSecondary: (() -> Unit)?,
+    tertiaryLabel: String? = null,
+    onTertiary: (() -> Unit)? = null
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
@@ -633,6 +692,18 @@ private fun PermissionGuideDialog(
             }
 
             Spacer(Modifier.height(12.dp))
+
+            if (tertiaryLabel != null && onTertiary != null) {
+                SquishButton(
+                    text = tertiaryLabel,
+                    onClick = onTertiary,
+                    modifier = Modifier.fillMaxWidth(),
+                    container = scheme.surface,
+                    content = scheme.onSurface,
+                    fillWidth = true
+                )
+                Spacer(Modifier.height(8.dp))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -864,7 +935,7 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
                 label = "trailing"
             ) { granted ->
                 if (granted) {
-                    CheckStamp()
+                    CheckStamp(onClick = if (item.reopenable) onActivate else null)
                 } else {
                     SquishButton(
                         text = item.actionLabel,
@@ -890,11 +961,12 @@ private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onAct
 }
 
 @Composable
-private fun CheckStamp() {
+private fun CheckStamp(onClick: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(MaterialTheme.colorScheme.primary)
             .border(2.dp, DarmixTheme.colors.ink, CircleShape),
         contentAlignment = Alignment.Center
