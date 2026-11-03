@@ -27,11 +27,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
+import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
 
 @Composable
 fun OverlayNoticeHelpCard(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
+    val skinId by rememberSelectedSkinId()
+    val petName = SkinLore.forId(skinId).shortName
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 90f else 0f, label = "chevron")
 
@@ -52,7 +55,7 @@ fun OverlayNoticeHelpCard(modifier: Modifier = Modifier) {
             Icon(DarmixIcons.Bell, null, tint = scheme.onSurface, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             Text(
-                "Aviso «se muestra sobre otras apps»",
+                highlighted("Aviso «se muestra sobre otras apps»"),
                 style = MaterialTheme.typography.titleSmall,
                 color = scheme.onSurface,
                 modifier = Modifier.weight(1f)
@@ -67,22 +70,26 @@ fun OverlayNoticeHelpCard(modifier: Modifier = Modifier) {
         if (expanded) {
             Spacer(Modifier.height(10.dp))
             Text(
-                "Android muestra ese aviso siempre que una app flota sobre otras, como Archi. " +
-                        "Lo pone el sistema y la app no puede quitarlo. No afecta el funcionamiento.",
+                highlighted(
+                    "Android muestra ese aviso siempre que una app flota sobre otras, como $petName. " +
+                            "Lo pone el sistema y la app no puede quitarlo. No afecta el funcionamiento."
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurface
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Para ocultarlo: mantén presionado el aviso, entra a sus ajustes (⚙) y desactiva " +
-                        "la notificación de DarmixPet «mostrándose sobre otras apps» (aparece bajo «Android System»). " +
-                        "Los nombres cambian según el teléfono y en algunos no se puede ocultar.",
+                highlighted(
+                    "Para ocultarlo: mantén presionado el aviso, entra a sus ajustes (⚙) y desactiva " +
+                            "la notificación de DarmixPet «mostrándose sobre otras apps» (aparece bajo «Android System»). " +
+                            "Los nombres cambian según el teléfono y en algunos no se puede ocultar."
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Ojo: no desactives la notificación «DarmixPet activo»; es la que mantiene viva a Archi.",
+                highlighted("Ojo: no desactives la notificación «DarmixPet activo»; es la que mantiene vivo a $petName."),
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant
             )

@@ -5,10 +5,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.RadialGradientShader
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import kotlin.math.PI
@@ -18,32 +16,24 @@ import kotlin.math.sin
 class AuraColors(
     val outer: Color,
     val glow: Color,
-    val core: Color,
-    val powerOuter: Color,
-    val powerGlow: Color
+    val core: Color
 )
 
 fun auraColorsFor(skinId: String): AuraColors = when (skinId) {
     "skin2" -> AuraColors(
         outer = Color(0xFF4ADE80),
         glow = Color(0xFF86EFAC),
-        core = Color(0xFFF0FFF4),
-        powerOuter = Color(0xFF16A34A),
-        powerGlow = Color(0xFF4ADE80)
+        core = Color(0xFFF0FFF4)
     )
     "skin3" -> AuraColors(
         outer = Color(0xFFF5B83D),
         glow = Color(0xFFFFD978),
-        core = Color(0xFFFFF7DE),
-        powerOuter = Color(0xFFE8890C),
-        powerGlow = Color(0xFFFFC233)
+        core = Color(0xFFFFF7DE)
     )
     else -> AuraColors(
         outer = Color(0xFF22D3EE),
         glow = Color(0xFF67E8F9),
-        core = Color(0xFFF0FDFF),
-        powerOuter = Color(0xFF0284C7),
-        powerGlow = Color(0xFF22D3EE)
+        core = Color(0xFFF0FDFF)
     )
 }
 
@@ -53,134 +43,100 @@ fun elementIconFor(skinId: String): ImageVector = when (skinId) {
     else -> DarmixIcons.Moon
 }
 
-private const val TONGUES = 9
-private const val ARC_START = 0.62f
-private val ARC_END = -PI.toFloat() - 0.62f
-private const val VALLEY = 0.84f
-private val TWO_PI = 2f * PI.toFloat()
-
-private val TONGUE_SPEED = intArrayOf(2, 3, 1, 2, 3, 2, 1, 3, 2)
-private val TONGUE_PHASE = floatArrayOf(0.00f, 0.37f, 0.71f, 0.15f, 0.52f, 0.88f, 0.26f, 0.63f, 0.05f)
-
-private class AuraLayer(
-    val scaleX: Float,
-    val scaleY: Float,
-    val lift: Float,
-    val flare: Float,
-    val blurDp: Float,
-    val phaseShift: Float
+private class Bolt(
+    val x: Float,
+    val y: Float,
+    val angleDeg: Float,
+    val length: Float,
+    val curve: Float,
+    val phase: Float
 )
 
-private val OUTER = AuraLayer(1.14f, 1.10f, 0.40f, 0.12f, 10f, 0.33f)
-private val MAIN = AuraLayer(1.00f, 1.00f, 0.34f, 0.10f, 2f, 0.00f)
-private val CORE = AuraLayer(0.58f, 0.66f, 0.18f, 0.06f, 7f, 0.61f)
+private val BOLTS = listOf(
+    Bolt(-38f, -40f, -62f, 46f, 0.25f, 0.00f),
+    Bolt(34f, -50f, -115f, 38f, -0.30f, 0.41f),
+    Bolt(-46f, 22f, -80f, 38f, 0.20f, 0.17f),
+    Bolt(46f, 8f, -100f, 44f, -0.20f, 0.73f),
+    Bolt(-8f, 58f, -15f, 50f, 0.35f, 0.29f),
+    Bolt(18f, -14f, -70f, 30f, 0.20f, 0.58f)
+)
 
-fun DrawScope.drawEnergyAura(
-    center: Offset,
-    radiusX: Float,
-    radiusY: Float,
-    t: Float,
-    breath: Float,
-    colors: AuraColors,
-    power: Float = 0f
-) {
-    val p = power.coerceIn(0f, 1f)
-    val pulse = (1f + 0.035f * breath) * (1f + 0.30f * p)
-    val rx = radiusX * pulse
-    val ry = radiusY * pulse
-    val color = lerp(colors.outer, colors.powerOuter, p)
-    val glow = lerp(colors.glow, colors.powerGlow, p)
-    val core = lerp(colors.core, Color.White, p)
-    val boost = 1f + 0.6f * p
+private const val BOLT_SEGMENTS = 7
+private val BOLT_LIFT_DP = floatArrayOf(0f, 10f, 18f)
+private val BOLT_STRETCH = floatArrayOf(1f, 1f, 1.3f)
 
-    drawLayer(OUTER, center, rx, ry, t, density, boost) { paint, _ ->
-        paint.color = color.copy(alpha = 0.40f + 0.35f * p)
-    }
-    drawLayer(MAIN, center, rx, ry, t, density, boost) { paint, layerRy ->
-        paint.shader = RadialGradientShader(
-            center = Offset(center.x, center.y + layerRy * 0.18f),
-            radius = layerRy * 1.18f,
-            colors = listOf(
-                core.copy(alpha = 0.95f),
-                core.copy(alpha = 0.80f),
-                glow.copy(alpha = 0.92f),
-                color.copy(alpha = 0.85f),
-                color.copy(alpha = 0f)
-            ),
-            colorStops = listOf(0f, 0.38f, 0.66f, 0.84f, 1f),
-            tileMode = androidx.compose.ui.graphics.TileMode.Clamp
-        )
-    }
-    drawLayer(CORE, center, rx, ry, t, density, boost) { paint, _ ->
-        paint.color = core.copy(alpha = 0.55f + 0.30f * p)
-    }
+private fun hash(n: Int): Float {
+    var x = n
+    x = (x shl 13) xor x
+    val v = (x * (x * x * 15731 + 789221) + 1376312589) and 0x7fffffff
+    return 1f - v / 1073741824f
 }
 
-private inline fun DrawScope.drawLayer(
-    layer: AuraLayer,
-    center: Offset,
-    rx: Float,
-    ry: Float,
-    t: Float,
-    density: Float,
-    boost: Float,
-    style: (Paint, Float) -> Unit
-) {
-    val layerRx = rx * layer.scaleX
-    val layerRy = ry * layer.scaleY
-    val path = auraPath(
-        center, layerRx, layerRy, (t + layer.phaseShift) % 1f,
-        layer.lift * boost, layer.flare * boost
-    )
-    val paint = Paint().apply { isAntiAlias = true }
-    style(paint, layerRy)
-    if (layer.blurDp > 0f) {
-        paint.asFrameworkPaint().maskFilter = BlurMaskFilter(layer.blurDp * density, BlurMaskFilter.Blur.NORMAL)
+private fun boltVisible(u: Float): Boolean = u < 0.10f || (u >= 0.16f && u < 0.30f)
+
+fun DrawScope.drawLightning(center: Offset, t: Float, colors: AuraColors, visibility: Float) {
+    val v = visibility.coerceIn(0f, 1f)
+    if (v <= 0.01f) return
+    val dp = density
+    val glowPaint = Paint().apply {
+        isAntiAlias = true
+        style = androidx.compose.ui.graphics.PaintingStyle.Stroke
+        strokeJoin = androidx.compose.ui.graphics.StrokeJoin.Miter
+        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+        asFrameworkPaint().maskFilter = BlurMaskFilter(3.5f * dp, BlurMaskFilter.Blur.NORMAL)
     }
-    drawIntoCanvas { it.drawPath(path, paint) }
-}
+    BOLTS.forEachIndexed { index, bolt ->
+        val local = (t + bolt.phase) % 1f
+        val step = (local * 3f).toInt().coerceIn(0, 2)
+        val u = local * 3f - step
+        if (!boltVisible(u)) return@forEachIndexed
 
-private fun flicker(t: Float, i: Int): Float {
-    val a = (t * TONGUE_SPEED[i] + TONGUE_PHASE[i]) * TWO_PI
-    val v = 0.65f * sin(a) + 0.35f * sin(2f * a + i)
-    return (0.5f + 0.5f * v).coerceIn(0f, 1f)
-}
+        val length = bolt.length * dp * BOLT_STRETCH[step]
+        val start = Offset(center.x + bolt.x * dp, center.y + (bolt.y - BOLT_LIFT_DP[step]) * dp)
+        val angle = bolt.angleDeg * PI.toFloat() / 180f
+        val dx = cos(angle)
+        val dy = sin(angle)
+        val px = -dy
+        val py = dx
 
-private fun auraPath(
-    c: Offset,
-    rx: Float,
-    ry: Float,
-    t: Float,
-    lift: Float,
-    flare: Float
-): Path {
-    fun phi(u: Float) = ARC_START + (ARC_END - ARC_START) * u
-    fun point(angle: Float, k: Float) = Offset(c.x + rx * k * cos(angle), c.y + ry * k * sin(angle))
-
-    val bottom = Offset(c.x, c.y + ry * 0.62f)
-    val step = 1f / TONGUES
-    return Path().apply {
-        moveTo(bottom.x, bottom.y)
-        val first = point(phi(0f), VALLEY)
-        quadraticBezierTo(c.x + rx * 0.45f, c.y + ry * 0.70f, first.x, first.y)
-        for (i in 0 until TONGUES) {
-            val f = flicker(t, i)
-            val um = (i + 0.5f) * step
-            val angle = phi(um)
-            val tipBase = point(angle, 1f + flare * f)
-            val side = kotlin.math.abs(cos(angle))
-            val up = ry * lift * (0.45f + 0.55f * f) * (0.7f + 0.3f * side)
-            val outward = if (cos(angle) >= 0f) rx * 0.06f * side else -rx * 0.06f * side
-            val tip = Offset(tipBase.x + outward, tipBase.y - up)
-            val leadBase = point(phi(um - step * 0.5f), VALLEY + 0.06f)
-            val valley = point(phi((i + 1) * step), VALLEY + 0.04f * flicker(t, (i + 3) % TONGUES))
-            val midX = (tip.x + valley.x) / 2f
-            val trailX = midX + (c.x - midX) * 0.04f
-            val trailY = (tip.y + valley.y) / 2f + up * 0.05f
-            quadraticBezierTo(leadBase.x, leadBase.y - up * 0.35f, tip.x, tip.y)
-            quadraticBezierTo(trailX, trailY, valley.x, valley.y)
+        val points = (0..BOLT_SEGMENTS).map { k ->
+            val f = k.toFloat() / BOLT_SEGMENTS
+            val jitter = if (k == 0 || k == BOLT_SEGMENTS) 0f else hash(index * 97 + step * 13 + k) * 0.16f * length
+            val bend = bolt.curve * length * sin(PI.toFloat() * f)
+            Offset(start.x + dx * length * f + px * (jitter + bend), start.y + dy * length * f + py * (jitter + bend))
         }
-        quadraticBezierTo(c.x - rx * 0.45f, c.y + ry * 0.70f, bottom.x, bottom.y)
-        close()
+        val main = Path().apply {
+            moveTo(points[0].x, points[0].y)
+            for (k in 1 until points.size) lineTo(points[k].x, points[k].y)
+        }
+        val branchStart = points[3]
+        val branchAngle = angle + if (hash(index * 7 + step) >= 0f) 0.8f else -0.8f
+        val branchLength = length * 0.32f
+        val branch = Path().apply {
+            moveTo(branchStart.x, branchStart.y)
+            lineTo(
+                branchStart.x + cos(branchAngle) * branchLength * 0.5f + px * branchLength * 0.12f,
+                branchStart.y + sin(branchAngle) * branchLength * 0.5f + py * branchLength * 0.12f
+            )
+            lineTo(branchStart.x + cos(branchAngle) * branchLength, branchStart.y + sin(branchAngle) * branchLength)
+        }
+
+        glowPaint.color = colors.outer.copy(alpha = 0.9f * v)
+        glowPaint.strokeWidth = 7f * dp
+        drawIntoCanvas { it.drawPath(main, glowPaint) }
+        glowPaint.strokeWidth = 5f * dp
+        drawIntoCanvas { it.drawPath(branch, glowPaint) }
+
+        val core = colors.core.copy(alpha = v)
+        drawPath(main, core, style = androidx.compose.ui.graphics.drawscope.Stroke(
+            width = 2.4f * dp,
+            join = androidx.compose.ui.graphics.StrokeJoin.Miter,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round
+        ))
+        drawPath(branch, core, style = androidx.compose.ui.graphics.drawscope.Stroke(
+            width = 1.8f * dp,
+            join = androidx.compose.ui.graphics.StrokeJoin.Miter,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round
+        ))
     }
 }

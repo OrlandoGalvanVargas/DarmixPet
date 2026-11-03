@@ -54,7 +54,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -439,7 +438,7 @@ private fun GuideScene(
     ) {
 
         Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp)) {
-            StatusBadge(chip, DarmixIcons.Sparkle, scheme.primary, scheme.onPrimary)
+            StatusBadge(chip, gestureIcon(kind), scheme.primary, scheme.onPrimary)
         }
 
 
@@ -587,6 +586,13 @@ private fun GuideScene(
 }
 
 
+
+private fun gestureIcon(kind: GestureKind): ImageVector = when (kind) {
+    GestureKind.TAP1, GestureKind.TAP2, GestureKind.TAP3 -> DarmixIcons.Touch
+    GestureKind.HOLD -> DarmixIcons.TouchHold
+    GestureKind.DRAG -> DarmixIcons.TouchDrag
+    GestureKind.AUTO -> DarmixIcons.Bell
+}
 
 private fun mockShape(style: BubbleShapeStyle): Shape = when (style) {
     BubbleShapeStyle.ARCANE_GLOW -> RoundedCornerShape(22.dp)
@@ -787,6 +793,11 @@ private fun DrawScope.touchDot(center: Offset, ink: Color, alpha: Float) {
     drawCircle(ink.copy(alpha = alpha), 11.dp.toPx(), center, style = Stroke(2.dp.toPx()))
 }
 
+private const val BURST_DOTS = 22
+
+private fun burstSeed(i: Int, salt: Int): Float =
+    ((sin((i * 12.9898f + salt * 78.233f)) * 43758.547f) % 1f + 1f) % 1f
+
 private fun DrawScope.sparkleBurst(
     t: Float,
     start: Float,
@@ -799,29 +810,17 @@ private fun DrawScope.sparkleBurst(
 ) {
     val p = (t - start) / dur
     if (p !in 0f..1f) return
-    for (i in 0 until 8) {
-        val a = (i * 45f + 10f) * PI.toFloat() / 180f
-        val r = (34f + maxRadiusDp * p).dp.toPx()
+    val eased = 1f - (1f - p) * (1f - p)
+    for (i in 0 until BURST_DOTS) {
+        val a = (i.toFloat() / BURST_DOTS) * 2f * PI.toFloat() + burstSeed(i, 1) * 0.5f
+        val reach = 0.55f + 0.65f * burstSeed(i, 2)
+        val r = (28f + maxRadiusDp * reach * eased).dp.toPx()
         val c = if (i % 2 == 0) gold else accent
-        drawSparkle(
-            Offset(center.x + r * cos(a), center.y + r * sin(a)),
-            ((1f - p) * 9f * sizeScale + 2f).dp.toPx(),
-            c.copy(alpha = 1f - p)
+        val dotRadius = ((1f - p) * (1.2f + 1.6f * burstSeed(i, 3)) * sizeScale + 0.8f).dp.toPx()
+        drawCircle(
+            color = c.copy(alpha = 1f - p),
+            radius = dotRadius,
+            center = Offset(center.x + r * cos(a), center.y + r * sin(a))
         )
     }
-}
-
-private fun DrawScope.drawSparkle(center: Offset, radius: Float, color: Color) {
-    val path = Path().apply {
-        val inner = radius * 0.34f
-        for (i in 0 until 8) {
-            val r = if (i % 2 == 0) radius else inner
-            val a = (PI / 4.0 * i - PI / 2.0).toFloat()
-            val x = center.x + r * cos(a)
-            val y = center.y + r * sin(a)
-            if (i == 0) moveTo(x, y) else lineTo(x, y)
-        }
-        close()
-    }
-    drawPath(path, color)
 }

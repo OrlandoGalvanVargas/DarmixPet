@@ -446,6 +446,42 @@ object DarmixIcons {
         }
     }
 
+    val Touch: ImageVector by lazy {
+        icon("Touch") {
+            wash { circle(12f, 12f, 3.6f) }
+            outline { circle(12f, 12f, 3.6f) }
+            outline(width = 1.7f) {
+                moveTo(5.6f, 9.2f); arcTo(7f, 7f, 0f, false, true, 9.2f, 5.6f)
+                moveTo(14.8f, 5.6f); arcTo(7f, 7f, 0f, false, true, 18.4f, 9.2f)
+                moveTo(18.4f, 14.8f); arcTo(7f, 7f, 0f, false, true, 14.8f, 18.4f)
+                moveTo(9.2f, 18.4f); arcTo(7f, 7f, 0f, false, true, 5.6f, 14.8f)
+            }
+        }
+    }
+
+    val TouchHold: ImageVector by lazy {
+        icon("TouchHold") {
+            wash { circle(12f, 12f, 3.6f) }
+            outline { circle(12f, 12f, 3.6f) }
+            outline(width = 2.2f) {
+                moveTo(12f, 3.5f); arcTo(8.5f, 8.5f, 0f, true, true, 3.5f, 12f)
+            }
+        }
+    }
+
+    val TouchDrag: ImageVector by lazy {
+        icon("TouchDrag") {
+            wash { circle(12f, 12f, 3.6f) }
+            outline { circle(12f, 12f, 3.6f) }
+            outline(width = 2f) {
+                moveTo(2.5f, 12f); lineTo(6.2f, 12f)
+                moveTo(4.4f, 9.8f); lineTo(2.5f, 12f); lineTo(4.4f, 14.2f)
+                moveTo(21.5f, 12f); lineTo(17.8f, 12f)
+                moveTo(19.6f, 9.8f); lineTo(21.5f, 12f); lineTo(19.6f, 14.2f)
+            }
+        }
+    }
+
     val HalfCircle: ImageVector by lazy {
         icon("HalfCircle") {
             wash {

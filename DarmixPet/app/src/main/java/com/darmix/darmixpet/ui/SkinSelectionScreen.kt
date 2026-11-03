@@ -3,7 +3,6 @@ package com.darmix.darmixpet.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -20,6 +19,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,6 +51,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -98,9 +101,7 @@ private val SpriteFilterQuality = FilterQuality.Medium
 
 private const val FRAME_DELAY_MS = 140L
 
-private const val AURA_FLICKER_MS = 1400
-private const val POWER_UP_MS = 320
-private const val POWER_DOWN_MS = 520
+private const val LIGHTNING_LOOP_MS = 1500
 
 private class SkinFrames(val idle: List<ImageBitmap>, val tripleTap: List<ImageBitmap>)
 
@@ -271,7 +272,7 @@ fun SkinSelectionScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(start = 20.dp, end = 24.dp),
             label = "infoPanel"
         ) { page ->
-            SkinInfoPanel(skin = skins[page], lore = SkinLore.forId(skins[page].id))
+            SkinLetterCard(skin = skins[page], lore = SkinLore.forId(skins[page].id))
         }
     }
 }
@@ -318,34 +319,41 @@ private fun SkinStage(
         ),
         label = "float"
     )
-    val flame by infinite.animateFloat(
+    val spark by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(AURA_FLICKER_MS, easing = LinearEasing)),
-        label = "flame"
+        animationSpec = infiniteRepeatable(tween(LIGHTNING_LOOP_MS, easing = LinearEasing)),
+        label = "spark"
     )
 
 
     val auraColors = remember(skin.id) { auraColorsFor(skin.id) }
-    val power = remember { Animatable(0f) }
+    val orbitKind = remember(skin.id) { orbitKindFor(skin.id) }
+    var fxTime by remember { mutableFloatStateOf(-1f) }
     LaunchedEffect(page, frames) {
         celebrate.collect { target ->
             val tripleTap = frames?.tripleTap.orEmpty()
-            if (target == page && tripleTap.isNotEmpty() && reaction == null) {
-                reaction = tripleTap
-                val charge = launch {
-                    power.animateTo(1f, tween(POWER_UP_MS, easing = FastOutSlowInEasing))
+            if (target == page && fxTime < 0f) {
+                reaction = tripleTap.takeIf { it.isNotEmpty() }
+                val start = withFrameMillis { it }
+                while (true) {
+                    val local = (withFrameMillis { it } - start).toFloat()
+                    fxTime = local
+                    val index = (local / FRAME_DELAY_MS).toInt()
+                    if (index < tripleTap.size) reactionIndex = index else reaction = null
+                    if (local >= ORBIT_FX_TOTAL_MS && reaction == null) break
                 }
-                for (i in tripleTap.indices) {
-                    reactionIndex = i
-                    delay(FRAME_DELAY_MS)
-                }
-                charge.cancel()
+                fxTime = -1f
                 reaction = null
-                power.animateTo(0f, tween(POWER_DOWN_MS, easing = FastOutSlowInEasing))
             }
         }
     }
+    val fx = fxTime
+    val lightningVisibility = if (fx < 0f) 1f else {
+        val hide = (fx / 120f).coerceIn(0f, 1f)
+        val show = ((fx - (ORBIT_FX_TOTAL_MS - 200f)) / 200f).coerceIn(0f, 1f)
+        1f - hide + show
+    }.coerceIn(0f, 1f)
 
     Column(
         modifier = Modifier
@@ -372,15 +380,31 @@ private fun SkinStage(
                         size = Size(w, h)
                     )
 
-                    drawEnergyAura(
-                        center = Offset(cx, cy + float * 7.dp.toPx() + 4.dp.toPx()),
-                        radiusX = 60.dp.toPx(),
-                        radiusY = 90.dp.toPx(),
-                        t = flame,
-                        breath = float,
-                        colors = auraColors,
-                        power = power.value
-                    )
+                    if (fx >= 0f) {
+                        val glowAmount = orbitGlow(fx)
+                        if (glowAmount > 0f) {
+                            val glowRadius = 120.dp.toPx()
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(accent.copy(alpha = 0.5f * glowAmount), Color.Transparent),
+                                    center = Offset(cx, cy),
+                                    radius = glowRadius
+                                ),
+                                radius = glowRadius,
+                                center = Offset(cx, cy)
+                            )
+                        }
+                        drawSelectionOrbit(
+                            local = fx,
+                            kind = orbitKind,
+                            center = Offset(cx, cy + float * 7.dp.toPx()),
+                            front = false,
+                            colors = auraColors,
+                            accent = accent,
+                            primary = skinScheme.primary,
+                            ink = colors.ink
+                        )
+                    }
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -405,6 +429,29 @@ private fun SkinStage(
                 HatBadge(size = 72.dp)
             }
 
+
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                if (fx >= 0f) {
+                    drawSelectionOrbit(
+                        local = fx,
+                        kind = orbitKind,
+                        center = Offset(cx, cy + float * 7.dp.toPx()),
+                        front = true,
+                        colors = auraColors,
+                        accent = accent,
+                        primary = skinScheme.primary,
+                        ink = colors.ink
+                    )
+                }
+                drawLightning(
+                    center = Offset(cx, cy + float * 7.dp.toPx()),
+                    t = spark,
+                    colors = auraColors,
+                    visibility = lightningVisibility
+                )
+            }
 
             Box(modifier = Modifier.align(Alignment.TopEnd)) {
                 this@Column.AnimatedVisibility(
@@ -497,151 +544,5 @@ private fun CurrentCompanionBanner() {
             style = MaterialTheme.typography.labelLarge,
             color = scheme.onPrimaryContainer
         )
-    }
-}
-
-
-
-@Composable
-private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
-    val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
-    val skinColors = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).extras
-    val skinScheme = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).scheme
-    val accent = Color(skin.accentColor)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .sticker(shape = MaterialTheme.shapes.large, depth = 3.dp)
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-
-        Column {
-            Text(
-                "${lore.shortName} dice",
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-            Text(
-                "“${lore.quote}”",
-                style = MaterialTheme.typography.titleSmall,
-                color = scheme.onSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .sticker(
-                        shape = RoundedCornerShape(
-                            topStart = 22.dp, topEnd = 22.dp, bottomEnd = 22.dp, bottomStart = 6.dp
-                        ),
-                        fill = accent.copy(alpha = 0.18f).compositeOver(scheme.surface),
-                        depth = 0.dp,
-                        borderWidth = 1.5.dp
-                    )
-                    .padding(14.dp)
-            )
-        }
-
-        Text(
-            skin.description,
-            style = MaterialTheme.typography.bodyLarge,
-            color = scheme.onSurface
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FactTile("Personalidad", lore.personality, Modifier.weight(1f))
-            FactTile("Elemento", lore.element, Modifier.weight(1f))
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SectionLabel("Su historia")
-            Text(
-                lore.story,
-                style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurface
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .sticker(
-                    shape = RoundedCornerShape(20.dp),
-                    fill = skinScheme.primaryContainer,
-                    depth = 0.dp,
-                    borderWidth = 1.5.dp
-                )
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(
-                elementIconFor(skin.id), contentDescription = null,
-                tint = skinScheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    "Su misión en la app",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = skinScheme.onPrimaryContainer
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    lore.mission,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = skinScheme.onPrimaryContainer
-                )
-            }
-        }
-
-        if (lore.palette.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Su paleta")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    lore.palette.forEach { hex ->
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color(hex))
-                                .border(
-                                    2.dp,
-                                    if (DarmixTheme.isDark) scheme.onSurfaceVariant.copy(alpha = 0.6f) else colors.ink,
-                                    CircleShape
-                                )
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-@Composable
-private fun FactTile(label: String, value: String, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    Column(
-        modifier = modifier
-            .sticker(
-                shape = RoundedCornerShape(18.dp),
-                fill = scheme.surfaceVariant,
-                depth = 0.dp,
-                borderWidth = 1.5.dp
-            )
-            .padding(12.dp)
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-        Spacer(Modifier.height(2.dp))
-        Text(value, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
     }
 }

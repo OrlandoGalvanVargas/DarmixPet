@@ -3,7 +3,6 @@ package com.darmix.darmixpet.ui
 import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -41,12 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -62,9 +58,6 @@ import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 object SetupProgressPrefs {
     private const val PREFS_NAME = "darmixpet_prefs"
@@ -236,15 +229,8 @@ private fun PetStage(skinId: String, petName: String) {
         animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "float"
     )
-    val twinkle by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
-        label = "twinkle"
-    )
 
     val halo = scheme.primaryContainer
-    val sparkleColor = scheme.primary
     val shadowColor = colors.ink.copy(alpha = 0.18f)
 
     Box(
@@ -259,22 +245,6 @@ private fun PetStage(skinId: String, petName: String) {
                 radius = size.minDimension * 0.48f,
                 center = c
             )
-            val sparkles = listOf(
-                Triple(-0.36f, -0.30f, 0.00f),
-                Triple(0.38f, -0.22f, 0.33f),
-                Triple(0.30f, 0.30f, 0.66f),
-                Triple(-0.40f, 0.20f, 0.15f),
-                Triple(0.02f, -0.44f, 0.50f)
-            )
-            sparkles.forEach { (dx, dy, phase) ->
-                val t = ((twinkle + phase) % 1f)
-                val pulse = (sin(t * 2f * PI.toFloat()) + 1f) / 2f
-                drawSparkle(
-                    center = Offset(c.x + dx * size.width, c.y + dy * size.height),
-                    radius = 5.dp.toPx() + pulse * 5.dp.toPx(),
-                    color = sparkleColor.copy(alpha = 0.35f + 0.65f * pulse)
-                )
-            }
             drawOval(
                 color = shadowColor,
                 topLeft = Offset(c.x - 34.dp.toPx() + float * 3.dp.toPx(), c.y + 66.dp.toPx()),
@@ -299,19 +269,6 @@ private fun PetStage(skinId: String, petName: String) {
             )
         }
     }
-}
-
-private fun DrawScope.drawSparkle(center: Offset, radius: Float, color: Color) {
-    val path = Path()
-    for (i in 0 until 8) {
-        val r = if (i % 2 == 0) radius else radius * 0.36f
-        val a = (PI / 4 * i - PI / 2).toFloat()
-        val x = center.x + r * cos(a)
-        val y = center.y + r * sin(a)
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-    }
-    path.close()
-    drawPath(path, color)
 }
 
 @Composable

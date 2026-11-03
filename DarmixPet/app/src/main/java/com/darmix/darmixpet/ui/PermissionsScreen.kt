@@ -61,12 +61,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
@@ -805,25 +800,5 @@ private fun StepRow(number: Int, text: String) {
                 .weight(1f)
                 .padding(top = 3.dp)
         )
-    }
-}
-
-private val HIGHLIGHT_PATTERN = Regex("«([^»]+)»")
-
-@Composable
-private fun highlighted(text: String): AnnotatedString {
-    val color = MaterialTheme.colorScheme.primary
-    return remember(text, color) {
-        buildAnnotatedString {
-            var cursor = 0
-            HIGHLIGHT_PATTERN.findAll(text).forEach { match ->
-                append(text.substring(cursor, match.range.first))
-                withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold, color = color)) {
-                    append(match.groupValues[1])
-                }
-                cursor = match.range.last + 1
-            }
-            append(text.substring(cursor))
-        }
     }
 }
