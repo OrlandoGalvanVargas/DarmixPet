@@ -32,7 +32,7 @@ object UpdateChecker {
     const val OFFICIAL_PAGE_URL = "https://darmixista.dev/darmixpet/"
 
     private fun getLatestReleaseUrl(): String =
-        "https://api.github.com/repos/OrlandoGalvanVargas/DarmixPet/releases/latest?t=${System.currentTimeMillis()}"
+        "https://api.github.com/repos/OrlandoGalvanVargas/darmixpet/releases/latest?t=${System.currentTimeMillis()}"
 
     suspend fun check(): CheckResult = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
