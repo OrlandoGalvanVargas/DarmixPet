@@ -2,6 +2,7 @@ package com.darmix.darmixpet.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -15,21 +16,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,16 +35,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -67,16 +61,22 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.darmix.darmixpet.monitor.AccessibilityPermissionHelper
+import com.darmix.darmixpet.monitor.AppWatcherAccessibilityService
 import com.darmix.darmixpet.monitor.BatteryOptimizationHelper
 import com.darmix.darmixpet.monitor.BrightnessPermissionHelper
 import com.darmix.darmixpet.monitor.UsageStatsPermissionHelper
+import com.darmix.darmixpet.notifications.NotificationAccessHelper
 import com.darmix.darmixpet.overlay.NotificationPermissionHelper
 import com.darmix.darmixpet.overlay.OverlayPermissionHelper
 import com.darmix.darmixpet.ui.components.DotGridBackground
@@ -86,74 +86,153 @@ import com.darmix.darmixpet.ui.components.StatusBadge
 import com.darmix.darmixpet.ui.components.sticker
 import com.darmix.darmixpet.ui.icons.DarmixIcons
 import com.darmix.darmixpet.ui.theme.DarmixTheme
-import kotlinx.coroutines.delay
-import com.darmix.darmixpet.notifications.NotificationAccessHelper
 import com.darmix.darmixpet.ui.theme.rememberSelectedSkinId
 
+private enum class PermKey { ACCESSIBILITY, NOTIFICATION_ACCESS, USAGE, OVERLAY, NOTIFICATIONS, BATTERY, WRITE_SETTINGS }
 
-private enum class PermKey { RESTRICTED, OVERLAY, USAGE, NOTIFICATIONS, NOTIFICATION_ACCESS, BATTERY, ACCESSIBILITY, WRITE_SETTINGS }
+private val PERMISSION_ORDER = listOf(
+    PermKey.ACCESSIBILITY,
+    PermKey.NOTIFICATION_ACCESS,
+    PermKey.USAGE,
+    PermKey.OVERLAY,
+    PermKey.NOTIFICATIONS,
+    PermKey.BATTERY,
+    PermKey.WRITE_SETTINGS
+)
 
-private data class PermItem(
-    val key: PermKey,
+private data class StepContent(
     val icon: ImageVector,
+    val systemName: String,
     val title: String,
     val why: String,
-    val granted: Boolean,
-    val actionLabel: String = "Activar",
-    val badge: String? = null,
-    val reopenable: Boolean = false
-)
-
-private enum class NoteKind { TIP, WARNING }
-private data class GuideNote(val kind: NoteKind, val text: String)
-
-
-private data class PermGuide(
-    val icon: ImageVector,
-    val title: String,
-    val intro: String,
     val steps: List<String>,
-    val notes: List<GuideNote>,
-    val primaryLabel: String,
+    val note: String? = null,
+    val badge: String? = null,
+    val actionLabel: String = "Activar",
     val secondaryLabel: String? = null
 )
-
 
 private object RestrictedStepPrefs {
     private const val PREFS_NAME = "darmixpet_prefs"
     private const val KEY = "restricted_step_done"
-    fun isDone(context: Context) =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY, false)
+    private const val KEY_BLOCKED = "restricted_step_blocked"
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    fun isDone(context: Context) = prefs(context).getBoolean(KEY, false)
     fun setDone(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY, true).apply()
+        prefs(context).edit().putBoolean(KEY, true).apply()
+    }
+    fun clearDone(context: Context) {
+        prefs(context).edit().putBoolean(KEY, false).apply()
+    }
+    fun wasBlocked(context: Context) = prefs(context).getBoolean(KEY_BLOCKED, false)
+    fun setBlocked(context: Context) {
+        prefs(context).edit().putBoolean(KEY_BLOCKED, true).apply()
     }
 }
 
+private enum class RestrictedSettingsStyle { MENU, SWITCH }
+
+private enum class PhoneFamily { SAMSUNG, XIAOMI, OPPO_GROUP, HUAWEI, HONOR, VIVO, OTHER }
+
+private fun systemProperty(name: String): String = try {
+    val clazz = Class.forName("android.os.SystemProperties")
+    clazz.getMethod("get", String::class.java).invoke(null, name) as? String ?: ""
+} catch (e: Exception) {
+    ""
+}
+
+private fun phoneFamily(): PhoneFamily {
+    val names = listOf(Build.MANUFACTURER, Build.BRAND).map { it.lowercase() }
+    fun any(vararg values: String) = names.any { it in values }
+    return when {
+        any("samsung") -> PhoneFamily.SAMSUNG
+        any("xiaomi", "redmi", "poco") -> PhoneFamily.XIAOMI
+        any("oppo", "realme", "oneplus") -> PhoneFamily.OPPO_GROUP
+        any("huawei") -> PhoneFamily.HUAWEI
+        any("honor") -> PhoneFamily.HONOR
+        any("vivo", "iqoo") -> PhoneFamily.VIVO
+        else -> PhoneFamily.OTHER
+    }
+}
+
+private fun isHyperOs(): Boolean = systemProperty("ro.mi.os.version.name").isNotBlank()
+
+private fun restrictedSettingsStyle(family: PhoneFamily): RestrictedSettingsStyle =
+    if (family == PhoneFamily.XIAOMI && isHyperOs() && Build.VERSION.SDK_INT >= 35) RestrictedSettingsStyle.SWITCH
+    else RestrictedSettingsStyle.MENU
+
+private fun showsAutostart(family: PhoneFamily): Boolean = family in setOf(
+    PhoneFamily.XIAOMI, PhoneFamily.OPPO_GROUP, PhoneFamily.HUAWEI, PhoneFamily.HONOR, PhoneFamily.VIVO
+)
+
 private object PermissionIntents {
-    fun appDetails(context: Context) = Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")
-    )
+    private const val ACCESSIBILITY_DETAILS = "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
 
     fun freshTask(intent: Intent): Intent = intent.addFlags(
         Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     )
 
+    fun appDetails(context: Context) = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")
+    )
+
     fun restrictedAppDetails(context: Context) = freshTask(appDetails(context))
 
-    fun restrictedTrigger() = freshTask(AccessibilityPermissionHelper.buildPermissionIntent())
+    fun restrictedUnlock(context: Context, route: UnlockRoute): List<Intent> = when (route) {
+        UnlockRoute.APP_INFO -> listOf(restrictedAppDetails(context))
+        UnlockRoute.APP_LIST -> listOf(
+            freshTask(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)),
+            freshTask(Intent(Settings.ACTION_APPLICATION_SETTINGS)),
+            restrictedAppDetails(context)
+        )
+    }
 
-    fun appNotifications(context: Context) = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    fun accessibility(context: Context, direct: Boolean): List<Intent> = buildList {
+        if (direct && Build.VERSION.SDK_INT >= 33) {
+            add(
+                Intent(ACCESSIBILITY_DETAILS).putExtra(
+                    Intent.EXTRA_COMPONENT_NAME,
+                    ComponentName(context, AppWatcherAccessibilityService::class.java).flattenToString()
+                )
+            )
+        }
+        add(AccessibilityPermissionHelper.buildPermissionIntent())
+    }
 
+    fun notificationAccess(context: Context): List<Intent> =
+        NotificationAccessHelper.buildPermissionIntents(context)
 
-    fun usageAccess(context: Context) = Intent(
-        Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}")
+    fun usageAccess(context: Context): List<Intent> = listOf(
+        Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}")),
+        UsageStatsPermissionHelper.buildPermissionIntent()
+    )
+
+    fun overlay(context: Context): List<Intent> = listOf(
+        OverlayPermissionHelper.buildPermissionIntent(context),
+        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION),
+        appDetails(context)
+    )
+
+    fun appNotifications(context: Context): List<Intent> = listOf(
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+        appDetails(context)
+    )
+
+    fun battery(context: Context): List<Intent> = listOf(
+        BatteryOptimizationHelper.buildPermissionIntent(context),
+        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+        appDetails(context)
+    )
+
+    fun writeSettings(context: Context): List<Intent> = listOf(
+        BrightnessPermissionHelper.buildPermissionIntent(context),
+        Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS),
+        appDetails(context)
     )
 }
 
-private fun safeStart(context: Context, vararg intents: Intent?) {
+private fun safeStart(context: Context, intents: List<Intent>) {
     for (intent in intents) {
-        if (intent == null) continue
         try {
             context.startActivity(intent)
             return
@@ -162,12 +241,12 @@ private fun safeStart(context: Context, vararg intents: Intent?) {
     }
     Toast.makeText(context, "No pude abrir los ajustes. Ábrelos manualmente.", Toast.LENGTH_LONG).show()
 }
+
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
-
 
 private val TRUSTED_STORES = setOf(
     "com.android.vending",
@@ -203,169 +282,182 @@ private fun isInstalledFromTrustedStore(context: Context): Boolean {
     return false
 }
 
-
-
-private const val RESTRICTED_WARNING =
-    "¿El interruptor sale gris o ves el aviso «Ajuste restringido»? Completa antes el paso " +
-            "«Permitir ajustes restringidos» (arriba en esta pantalla)."
-
-private fun buildGuide(key: PermKey, restrictedNeeded: Boolean, notifBlocked: Boolean, petName: String): PermGuide {
-    val restrictedNote = if (restrictedNeeded) listOf(GuideNote(NoteKind.WARNING, RESTRICTED_WARNING)) else emptyList()
-    return when (key) {
-        PermKey.RESTRICTED -> PermGuide(
-            icon = DarmixIcons.Lock,
-            title = "Permitir ajustes restringidos",
-            intro = "En Android 13 o superior, si instalaste DarmixPet fuera de Google Play, el teléfono puede " +
-                    "bloquear algunos permisos hasta que tú lo autorices. Es una sola vez.",
-            steps = listOf(
-                "Se abrirá la pantalla «Información de la app» de DarmixPet.",
-                "Toca el menú ⋮ (arriba a la derecha) y elige «Permitir ajustes restringidos». " +
-                        "En algunos teléfonos esta opción está al final de la pantalla.",
-                "Confirma con tu huella, PIN o patrón si te lo pide.",
-                "Vuelve a DarmixPet y toca «Ya lo hice»."
-            ),
-            notes = listOf(
-                GuideNote(
-                    NoteKind.TIP,
-                    "¿No ves la opción? Android a veces solo la muestra después de intentar activar un permiso " +
-                            "bloqueado. Prueba primero con «Acceso a datos de uso»: saldrá un aviso, tócalo, " +
-                            "acepta y regresa a la Información de la app."
-                ),
-                GuideNote(
-                    NoteKind.TIP,
-                    "No podemos comprobar si ya lo permitiste; por eso te pedimos que nos avises."
-                )
-            ),
-            primaryLabel = "Abrir Info. de la app",
-            secondaryLabel = "Ya lo hice"
-        )
-
-        PermKey.OVERLAY -> PermGuide(
-            icon = DarmixIcons.Overlay,
-            title = "Mostrar sobre otras apps",
-            intro = "Permite que $petName aparezca flotando sobre tus apps.",
-            steps = listOf(
-                "Se abrirá la pantalla de DarmixPet.",
-                "Activa «Permitir mostrar sobre otras apps».",
-                "Vuelve a DarmixPet con el botón Atrás."
-            ),
-            notes = restrictedNote + GuideNote(
-                NoteKind.TIP,
-                "Después, Android puede mostrar un aviso «DarmixPet se muestra sobre otras apps». " +
-                        "Es normal: lo pone el sistema, no la app, y no afecta nada."
-            ),
-            primaryLabel = "Abrir ajustes"
-        )
-
-        PermKey.USAGE -> PermGuide(
-            icon = DarmixIcons.Hourglass,
-            title = "Acceso a datos de uso",
-            intro = "Permite a DarmixPet saber cuánto tiempo pasas en cada app para aplicar tus límites.",
-            steps = listOf(
-                "Se abrirá la pantalla de DarmixPet. Si ves una lista de apps, busca «DarmixPet» y tócalo.",
-                "Activa «Permitir acceso al uso».",
-                "Si Android muestra un aviso de seguridad, léelo y acepta. En algunos teléfonos el botón " +
-                        "tarda unos segundos en habilitarse.",
-                "Vuelve a DarmixPet."
-            ),
-            notes = restrictedNote,
-            primaryLabel = "Abrir ajustes"
-        )
-
-        PermKey.NOTIFICATIONS -> PermGuide(
-            icon = DarmixIcons.Bell,
-            title = "Notificaciones",
-            intro = "Sirven para avisarte cuando una app entra en descanso y para mostrar que $petName está activo.",
-            steps = if (notifBlocked) listOf(
-                "Como rechazaste el permiso antes, Android ya no muestra la ventana de aviso.",
-                "Se abrirán los ajustes de notificaciones de DarmixPet.",
-                "Activa «Permitir notificaciones» y vuelve a DarmixPet."
-            ) else listOf(
-                "Android mostrará una ventana: toca «Permitir».",
-                "Si la rechazas, puedes volver a tocar «Activar» para intentarlo otra vez."
-            ),
-            notes = emptyList(),
-            primaryLabel = if (notifBlocked) "Abrir ajustes" else "Continuar"
-        )
-        PermKey.NOTIFICATION_ACCESS -> PermGuide(
-            icon = DarmixIcons.Mail,
-            title = "Leer notificaciones",
-            intro = "Permite que $petName te muestre tus notificaciones con un toque, para leerlas, " +
-                    "abrirlas o eliminarlas sin bajar la barra.",
-            steps = listOf(
-                "Se abrirá «Acceso a notificaciones». Si ves una lista de apps, busca «DarmixPet» y tócalo.",
-                "Activa «Permitir acceso a notificaciones».",
-                "Android mostrará un aviso sobre lo que la app podrá leer. Toca «Permitir».",
-                "Vuelve a DarmixPet."
-            ),
-            notes = restrictedNote + listOf(
-                GuideNote(
-                    NoteKind.TIP,
-                    "DarmixPet solo lee tus notificaciones para mostrártelas en $petName. " +
-                            "No las guarda ni las envía a ningún lado."
-                ),
-                GuideNote(
-                    NoteKind.TIP,
-                    "¿Se abrió otra pantalla? Según la marca puede estar en «Acceso especial», " +
-                            "«Privacidad» o «Notificaciones → Configuración avanzada». También puedes " +
-                            "escribir «acceso a notificaciones» en el buscador de Ajustes."
-                )
-            ),
-            primaryLabel = "Abrir ajustes"
-        )
-
-        PermKey.BATTERY -> PermGuide(
-            icon = DarmixIcons.Battery,
-            title = "Ignorar optimización de batería",
-            intro = "Para que $petName no se cierre solo por ahorro de batería. Si se cierra, dejas de estar protegido.",
-            steps = listOf(
-                "Se abrirá la configuración de batería de DarmixPet.",
-                "Elige «Sin restricciones». Según tu teléfono puede llamarse «No optimizar» o «Permitir».",
-                "Vuelve a DarmixPet."
-            ),
-            notes = listOf(
-                GuideNote(
-                    NoteKind.TIP,
-                    "Normalmente viene en «Optimizado» o «Ahorro de batería»: ese es el que hay que cambiar. " +
-                            "En Xiaomi, Huawei u otras marcas puede haber también «Inicio automático»; actívalo si lo ves."
-                )
-            ),
-            primaryLabel = "Abrir ajustes"
-        )
-
-        PermKey.ACCESSIBILITY -> PermGuide(
-            icon = DarmixIcons.Eye,
-            title = "Detección instantánea",
-            intro = "Permite saber al instante cuándo abres una app vigilada, para bloquearla a tiempo. " +
-                    "DarmixPet solo lo usa para detectar qué app está abierta.",
-            steps = listOf(
-                "Se abrirá Accesibilidad.",
-                "Entra a «Apps descargadas» (o «Servicios instalados» / «Apps instaladas») y toca DarmixPet.",
-                "Activa «Usar DarmixPet».",
-                "Android mostrará un aviso de seguridad sobre lo que la app podrá ver en pantalla. Acepta: " +
-                        "en algunos teléfonos el botón tarda unos 10 segundos en habilitarse.",
-                "Vuelve a DarmixPet."
-            ),
-            notes = restrictedNote,
-            primaryLabel = "Abrir ajustes"
-        )
-
-        PermKey.WRITE_SETTINGS -> PermGuide(
-            icon = DarmixIcons.Sun,
-            title = "Modificar ajustes del sistema",
-            intro = "Para ajustar el brillo desde el menú rápido de la mascota.",
-            steps = listOf(
-                "Se abrirá la pantalla de DarmixPet.",
-                "Activa «Permitir modificar los ajustes del sistema».",
-                "Vuelve a DarmixPet."
-            ),
-            notes = emptyList(),
-            primaryLabel = "Abrir ajustes"
-        )
-    }
+private fun accessibilityListHint(family: PhoneFamily): String = when (family) {
+    PhoneFamily.SAMSUNG -> "Baja casi hasta el final y toca «Apps instaladas»."
+    PhoneFamily.XIAOMI -> "Baja hasta el final y toca «Apps descargadas»."
+    PhoneFamily.OPPO_GROUP -> "Baja hasta encontrar «Apps descargadas» y tócalo."
+    PhoneFamily.HUAWEI -> "Baja hasta encontrar «Servicios instalados» y tócalo."
+    PhoneFamily.HONOR, PhoneFamily.VIVO -> "Baja hasta encontrar «Servicios descargados»."
+    PhoneFamily.OTHER -> "Baja hasta la sección «Apps descargadas»."
 }
 
+private enum class UnlockRoute { APP_INFO, APP_LIST }
 
+private fun unlockRoute(family: PhoneFamily): UnlockRoute =
+    if (family == PhoneFamily.OPPO_GROUP) UnlockRoute.APP_LIST else UnlockRoute.APP_INFO
+
+private fun unlockContent(style: RestrictedSettingsStyle, route: UnlockRoute): StepContent {
+    val allowStep = when (style) {
+        RestrictedSettingsStyle.SWITCH -> listOf(
+            "Baja hasta el final de la pantalla.",
+            "Activa «Permitir ajustes restringidos» y confirma con tu huella o PIN."
+        )
+        RestrictedSettingsStyle.MENU -> listOf(
+            "Toca los tres puntos «⋮» de arriba a la derecha.",
+            "Elige «Permitir ajustes restringidos» y confirma con tu huella o PIN."
+        )
+    }
+    val steps = buildList {
+        if (route == UnlockRoute.APP_LIST) add("Busca «DarmixPet» en la lista de apps y tócalo.")
+        addAll(allowStep)
+        add("Vuelve aquí y toca «Ya lo hice».")
+    }
+    val note = when {
+        style == RestrictedSettingsStyle.SWITCH -> null
+        route == UnlockRoute.APP_LIST -> null
+        else -> "¿No ves los tres puntos? Busca la opción al final de la pantalla o entra desde Ajustes → Apps → DarmixPet."
+    }
+    return StepContent(
+        icon = DarmixIcons.Lock,
+        systemName = "Ajustes restringidos",
+        title = "Desbloquea DarmixPet",
+        why = "Android bloquea este permiso en las apps que no vienen de una tienda. Solo hay que desbloquearlo una vez.",
+        steps = steps,
+        note = note,
+        badge = "Bloqueado por Android",
+        actionLabel = if (route == UnlockRoute.APP_LIST) "Abrir lista de apps" else "Abrir info de la app",
+        secondaryLabel = "Ya lo hice"
+    )
+}
+
+private fun stepContent(
+    key: PermKey,
+    petName: String,
+    family: PhoneFamily,
+    accessibilityDirect: Boolean,
+    probingRestricted: Boolean,
+    notifBlocked: Boolean
+): StepContent = when (key) {
+    PermKey.ACCESSIBILITY -> StepContent(
+        icon = DarmixIcons.Eye,
+        systemName = "Accesibilidad",
+        title = "Detección instantánea",
+        why = "Así $petName sabe en el momento qué app abriste y puede frenarla a tiempo.",
+        steps = when {
+            accessibilityDirect -> listOf(
+                "Activa el interruptor de «DarmixPet».",
+                "Toca «Permitir» en el aviso. A veces el botón tarda unos segundos en activarse.",
+                "Vuelve a DarmixPet."
+            )
+            probingRestricted -> listOf(
+                accessibilityListHint(family),
+                "Toca «DarmixPet» e intenta activarlo.",
+                "Si Android dice que es un «ajuste restringido», acepta el aviso y vuelve aquí. Te diremos cómo desbloquearlo."
+            )
+            else -> listOf(
+                accessibilityListHint(family),
+                "Toca «DarmixPet», activa el interruptor y toca «Permitir».",
+                "Vuelve a DarmixPet."
+            )
+        },
+        note = if (accessibilityDirect) {
+            "¿Se abrió la pantalla general de Accesibilidad? ${accessibilityListHint(family)}"
+        } else {
+            "DarmixPet solo lo usa para saber qué app está abierta."
+        }
+    )
+
+    PermKey.NOTIFICATION_ACCESS -> StepContent(
+        icon = DarmixIcons.Mail,
+        systemName = "Acceso a notificaciones",
+        title = "Ver tus notificaciones",
+        why = "Para que $petName te enseñe tus notificaciones con un toque, sin bajar la barra.",
+        steps = if (Build.VERSION.SDK_INT >= 30) listOf(
+            "Activa el interruptor.",
+            "Toca «Permitir» en el aviso.",
+            "Vuelve a DarmixPet."
+        ) else listOf(
+            "Busca «DarmixPet» en la lista y activa su interruptor.",
+            "Toca «Permitir» en el aviso.",
+            "Vuelve a DarmixPet."
+        ),
+        note = "Solo te las muestra. No las guarda ni las manda a ningún lado."
+    )
+
+    PermKey.USAGE -> StepContent(
+        icon = DarmixIcons.Hourglass,
+        systemName = "Acceso a datos de uso",
+        title = "Tiempo en cada app",
+        why = "Para medir cuánto tiempo pasas en las apps que vigilas.",
+        steps = listOf(
+            "Si ves una lista de apps, busca «DarmixPet» y tócalo.",
+            "Activa el interruptor.",
+            "Vuelve a DarmixPet."
+        )
+    )
+
+    PermKey.OVERLAY -> StepContent(
+        icon = DarmixIcons.Overlay,
+        systemName = "Mostrar sobre otras apps",
+        title = "Flotar sobre tus apps",
+        why = "Para que $petName pueda aparecer encima de las apps que estés usando.",
+        steps = if (Build.VERSION.SDK_INT >= 30) listOf(
+            "Busca «DarmixPet» en la lista de apps y tócalo.",
+            "Activa el interruptor.",
+            "Vuelve a DarmixPet."
+        ) else listOf(
+            "Activa el interruptor.",
+            "Vuelve a DarmixPet."
+        ),
+        note = if (Build.VERSION.SDK_INT >= 30) {
+            "Android ya no deja abrir esta opción directo, por eso primero aparece la lista."
+        } else null
+    )
+
+    PermKey.NOTIFICATIONS -> {
+        val runtime = Build.VERSION.SDK_INT >= 33 && !notifBlocked
+        StepContent(
+            icon = DarmixIcons.Bell,
+            systemName = "Notificaciones",
+            title = "Avisos de $petName",
+            why = "Para avisarte cuando una app entra en descanso.",
+            steps = if (runtime) listOf(
+                "Toca «Permitir» en la ventana que va a aparecer."
+            ) else listOf(
+                "Activa el interruptor de las notificaciones.",
+                "Vuelve a DarmixPet."
+            ),
+            note = if (notifBlocked) "Como antes elegiste no permitirlas, ahora se activan desde ajustes." else null,
+            actionLabel = if (runtime) "Permitir" else "Abrir ajustes"
+        )
+    }
+
+    PermKey.BATTERY -> StepContent(
+        icon = DarmixIcons.Battery,
+        systemName = "Optimización de batería",
+        title = "Siempre activo",
+        why = "Para que el ahorro de batería no cierre a $petName.",
+        steps = listOf(
+            "Toca «Permitir» en la ventana que va a aparecer.",
+            "Si en su lugar se abre una lista, busca «DarmixPet» y elige la opción sin restricciones."
+        ),
+        note = if (showsAutostart(family)) {
+            "En tu teléfono también puede haber «Inicio automático» en la info de DarmixPet. Si lo ves, actívalo."
+        } else null,
+        actionLabel = "Permitir"
+    )
+
+    PermKey.WRITE_SETTINGS -> StepContent(
+        icon = DarmixIcons.Sun,
+        systemName = "Modificar ajustes del sistema",
+        title = "Control de brillo",
+        why = "Para que puedas subir o bajar el brillo desde el menú rápido de $petName.",
+        steps = listOf(
+            "Activa el interruptor.",
+            "Vuelve a DarmixPet."
+        )
+    )
+}
 
 @RequiresApi(Build.VERSION_CODES.Q)
 @Composable
@@ -383,28 +475,41 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
     var hasBatteryExemption by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) }
     var hasAccessibility by remember { mutableStateOf(AccessibilityPermissionHelper.isAccessibilityServiceEnabled(context)) }
     var hasWriteSettings by remember { mutableStateOf(BrightnessPermissionHelper.hasWriteSettingsPermission(context)) }
-
     var hasNotificationAccess by remember { mutableStateOf(NotificationAccessHelper.isNotificationAccessGranted(context)) }
 
     var restrictedDone by remember { mutableStateOf(RestrictedStepPrefs.isDone(context)) }
-    var restrictedNoticeTried by rememberSaveable { mutableStateOf(false) }
-    var restrictedAwaitingReturn by rememberSaveable { mutableStateOf(false) }
+    var restrictedBlocked by remember { mutableStateOf(RestrictedStepPrefs.wasBlocked(context)) }
+    var awaitingRestrictedProbe by rememberSaveable { mutableStateOf(false) }
     var notifBlocked by remember { mutableStateOf(false) }
-    var openGuide by remember { mutableStateOf<PermKey?>(null) }
 
+    val family = remember { phoneFamily() }
+    val restrictedStyle = remember { restrictedSettingsStyle(family) }
+    val restrictedRoute = remember { unlockRoute(family) }
     val fromStore = remember { isInstalledFromTrustedStore(context) }
     val restrictedPossible = Build.VERSION.SDK_INT >= 33 && !fromStore
 
     val restrictedProven = hasAccessibility || hasNotificationAccess
     val restrictedGranted = restrictedDone || restrictedProven
-    val restrictedVisible = restrictedPossible && !(hasAccessibility && hasNotificationAccess)
-    val restrictedNeeded = restrictedVisible && !restrictedGranted
-    val restrictedWarn = restrictedPossible && !restrictedProven
+    val showUnlock = restrictedPossible && restrictedBlocked && !restrictedGranted
+    val accessibilityDirect = !restrictedPossible || restrictedGranted
+    val probingRestricted = restrictedPossible && !restrictedGranted
+
+    val grantedMap = mapOf(
+        PermKey.ACCESSIBILITY to hasAccessibility,
+        PermKey.NOTIFICATION_ACCESS to hasNotificationAccess,
+        PermKey.USAGE to hasUsageStats,
+        PermKey.OVERLAY to hasOverlay,
+        PermKey.NOTIFICATIONS to hasNotifications,
+        PermKey.BATTERY to hasBatteryExemption,
+        PermKey.WRITE_SETTINGS to hasWriteSettings
+    )
+    val current = PERMISSION_ORDER.firstOrNull { grantedMap[it] != true }
+    val grantedCount = PERMISSION_ORDER.count { grantedMap[it] == true }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasNotifications = granted
-
         notifBlocked = !granted && activity != null &&
                 !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
     }
@@ -421,10 +526,14 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
                 hasNotificationAccess = NotificationAccessHelper.isNotificationAccessGranted(context)
                 restrictedDone = RestrictedStepPrefs.isDone(context)
                 if (hasNotifications) notifBlocked = false
-                if (restrictedAwaitingReturn) {
-                    restrictedAwaitingReturn = false
-                    val proven = hasAccessibility || hasNotificationAccess
-                    if (!proven && !restrictedDone) openGuide = PermKey.RESTRICTED
+                if (awaitingRestrictedProbe) {
+                    awaitingRestrictedProbe = false
+                    if (!hasAccessibility && !hasNotificationAccess) {
+                        RestrictedStepPrefs.setBlocked(context)
+                        RestrictedStepPrefs.clearDone(context)
+                        restrictedBlocked = true
+                        restrictedDone = false
+                    }
                 }
             }
         }
@@ -432,298 +541,243 @@ fun PermissionsScreen(onAllGranted: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(hasOverlay, hasUsageStats, hasNotifications, hasNotificationAccess, hasBatteryExemption, hasAccessibility, hasWriteSettings) {
-        if (hasOverlay && hasUsageStats && hasNotifications && hasNotificationAccess &&
-            hasBatteryExemption && hasAccessibility && hasWriteSettings
-        ) {
+    var showIntro by rememberSaveable { mutableStateOf(true) }
+
+    LaunchedEffect(current) {
+        if (current == null) {
+            SetupProgressPrefs.markCompleted(context)
             onAllGranted()
         }
     }
 
-    fun requestNotifications() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            safeStart(context, PermissionIntents.appNotifications(context))
-        }
-    }
-
-    fun showRestrictedNotice() {
-        restrictedNoticeTried = true
-        restrictedAwaitingReturn = true
-        safeStart(context, PermissionIntents.restrictedTrigger())
-    }
-
-    fun openRestrictedAppInfo() {
-        restrictedAwaitingReturn = true
-        safeStart(context, PermissionIntents.restrictedAppDetails(context))
-    }
-
     fun launchFor(key: PermKey) {
-        if (restrictedNeeded && (key == PermKey.ACCESSIBILITY || key == PermKey.NOTIFICATION_ACCESS)) {
-            restrictedNoticeTried = true
-        }
+        val probesRestricted = key == PermKey.ACCESSIBILITY || key == PermKey.NOTIFICATION_ACCESS
+        if (probesRestricted && restrictedPossible && !restrictedProven) awaitingRestrictedProbe = true
         when (key) {
-            PermKey.RESTRICTED -> openRestrictedAppInfo()
-            PermKey.OVERLAY -> safeStart(context, OverlayPermissionHelper.buildPermissionIntent(context))
-            PermKey.USAGE -> safeStart(
-                context, PermissionIntents.usageAccess(context), UsageStatsPermissionHelper.buildPermissionIntent()
-            )
+            PermKey.ACCESSIBILITY -> safeStart(context, PermissionIntents.accessibility(context, accessibilityDirect))
+            PermKey.NOTIFICATION_ACCESS -> safeStart(context, PermissionIntents.notificationAccess(context))
+            PermKey.USAGE -> safeStart(context, PermissionIntents.usageAccess(context))
+            PermKey.OVERLAY -> safeStart(context, PermissionIntents.overlay(context))
             PermKey.NOTIFICATIONS ->
-                if (notifBlocked) safeStart(context, PermissionIntents.appNotifications(context))
-                else requestNotifications()
-            PermKey.NOTIFICATION_ACCESS -> safeStart(
-                context, *NotificationAccessHelper.buildPermissionIntents(context).toTypedArray()
-            )
-            PermKey.BATTERY -> safeStart(context, BatteryOptimizationHelper.buildPermissionIntent(context))
-            PermKey.ACCESSIBILITY -> safeStart(context, AccessibilityPermissionHelper.buildPermissionIntent())
-            PermKey.WRITE_SETTINGS -> safeStart(context, BrightnessPermissionHelper.buildPermissionIntent(context))
+                if (Build.VERSION.SDK_INT >= 33 && !notifBlocked) {
+                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    safeStart(context, PermissionIntents.appNotifications(context))
+                }
+            PermKey.BATTERY -> safeStart(context, PermissionIntents.battery(context))
+            PermKey.WRITE_SETTINGS -> safeStart(context, PermissionIntents.writeSettings(context))
         }
     }
 
     fun markRestrictedDone() {
         RestrictedStepPrefs.setDone(context)
         restrictedDone = true
-        restrictedAwaitingReturn = false
     }
 
-    val restrictedItem = PermItem(
-        key = PermKey.RESTRICTED,
-        icon = DarmixIcons.Lock,
-        title = "Permitir ajustes restringidos",
-        why = "Android bloquea algunos permisos en apps instaladas fuera de la tienda. Esto los desbloquea.",
-        granted = restrictedGranted,
-        badge = "Paso previo",
-        reopenable = restrictedDone && !restrictedProven
-    )
-
-    val items = listOf(
-        PermItem(PermKey.OVERLAY, DarmixIcons.Overlay, "Mostrar sobre otras apps",
-            "Para que $petName pueda pasear sobre tus apps.", hasOverlay),
-        PermItem(PermKey.USAGE, DarmixIcons.Hourglass, "Acceso a datos de uso",
-            "Para saber cuánto tiempo pasas en cada app.", hasUsageStats),
-        PermItem(PermKey.NOTIFICATIONS, DarmixIcons.Bell, "Notificaciones",
-            "Para avisarte cuando una app entra en descanso.", hasNotifications,
-            actionLabel = if (notifBlocked) "Abrir ajustes" else "Activar"),
-        PermItem(PermKey.NOTIFICATION_ACCESS, DarmixIcons.Mail, "Leer notificaciones",
-            "Para que $petName te muestre tus notificaciones con un toque.", hasNotificationAccess),
-        PermItem(PermKey.BATTERY, DarmixIcons.Battery, "Ignorar optimización de batería",
-            "Para que $petName no desaparezca por ahorro de batería.", hasBatteryExemption),
-        PermItem(PermKey.ACCESSIBILITY, DarmixIcons.Eye, "Detección instantánea",
-            "Para saber al instante cuándo abres una app vigilada.", hasAccessibility),
-        PermItem(PermKey.WRITE_SETTINGS, DarmixIcons.Sun, "Modificar ajustes del sistema",
-            "Para ajustar el brillo desde el menú rápido.", hasWriteSettings)
-    )
-
-    val grantedCount = items.count { it.granted }
-    val firstPending = (if (restrictedNeeded) listOf(restrictedItem) else emptyList<PermItem>())
-        .plus(items).firstOrNull { !it.granted }?.key
+    val unlocking = current == PermKey.ACCESSIBILITY && showUnlock
+    val stepIndex = current?.let { PERMISSION_ORDER.indexOf(it) } ?: (PERMISSION_ORDER.size - 1)
 
     DotGridBackground(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HatBadge(size = 68.dp)
-                Spacer(Modifier.width(16.dp))
+                HatBadge(size = 52.dp)
+                Spacer(Modifier.width(14.dp))
                 Column {
                     Text(
                         "Antes de empezar",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Spacer(Modifier.height(2.dp))
                     Text(
-                        "DarmixPet necesita estos permisos para cuidar tu tiempo de pantalla. " +
-                                "Te mostramos qué hacer en cada uno.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Paso ${stepIndex + 1} de ${PERMISSION_ORDER.size}",
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
-            ProgressCard(done = grantedCount, total = items.size, petName = petName)
+            Spacer(Modifier.height(16.dp))
+            StepGems(done = grantedCount, total = PERMISSION_ORDER.size, currentIndex = stepIndex)
             Spacer(Modifier.height(20.dp))
 
-            var index = 0
-            if (restrictedVisible) {
-                PermissionCard(
-                    item = restrictedItem,
-                    index = index++,
-                    highlight = firstPending == PermKey.RESTRICTED,
-                    onActivate = { openGuide = PermKey.RESTRICTED }
-                )
-                Spacer(Modifier.height(14.dp))
-            }
-            items.forEach { item ->
-                PermissionCard(
-                    item = item,
-                    index = index++,
-                    highlight = firstPending == item.key,
-                    onActivate = { openGuide = item.key }
-                )
-                Spacer(Modifier.height(14.dp))
+            if (current != null) {
+                AnimatedContent(
+                    targetState = current to unlocking,
+                    transitionSpec = {
+                        (slideInHorizontally(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)) { it / 2 } + fadeIn(tween(220))) togetherWith
+                                (slideOutHorizontally(tween(220)) { -it / 2 } + fadeOut(tween(180)))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    label = "permissionStep"
+                ) { (key, unlock) ->
+                    val content = if (unlock) unlockContent(restrictedStyle, restrictedRoute)
+                    else stepContent(key, petName, family, accessibilityDirect, probingRestricted, notifBlocked)
+                    StepCard(
+                        content = content,
+                        onPrimary = {
+                            if (unlock) safeStart(context, PermissionIntents.restrictedUnlock(context, restrictedRoute))
+                            else launchFor(key)
+                        },
+                        onSecondary = if (unlock) ({ markRestrictedDone() }) else null
+                    )
+                }
             }
         }
     }
 
-    openGuide?.let { key ->
-        val guide = buildGuide(key, restrictedWarn, notifBlocked, petName)
-        if (key == PermKey.RESTRICTED) {
-            val noticeFirst = !restrictedNoticeTried
-            PermissionGuideDialog(
-                guide = guide.copy(
-                    primaryLabel = if (noticeFirst) RESTRICTED_NOTICE_LABEL else guide.primaryLabel
-                ),
-                onDismiss = { openGuide = null },
-                onPrimary = {
-                    openGuide = null
-                    if (noticeFirst) showRestrictedNotice() else openRestrictedAppInfo()
-                },
-                onSecondary = {
-                    markRestrictedDone()
-                    openGuide = null
-                },
-                tertiaryLabel = if (noticeFirst) guide.primaryLabel else RESTRICTED_NOTICE_LABEL,
-                onTertiary = {
-                    openGuide = null
-                    if (noticeFirst) openRestrictedAppInfo() else showRestrictedNotice()
-                }
-            )
-        } else {
-            PermissionGuideDialog(
-                guide = guide,
-                onDismiss = { openGuide = null },
-                onPrimary = {
-                    openGuide = null
-                    launchFor(key)
-                },
-                onSecondary = null
-            )
-        }
+    if (showIntro && current != null) {
+        PermissionsIntroDialog(
+            granted = grantedCount,
+            total = PERMISSION_ORDER.size,
+            onStart = { showIntro = false }
+        )
     }
 }
 
-private const val RESTRICTED_NOTICE_LABEL = "Mostrar el aviso"
-
-
+@Composable
+private fun StepGems(done: Int, total: Int, currentIndex: Int) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(total) { i -> Gem(filled = i < done, active = i == currentIndex, modifier = Modifier.weight(1f)) }
+    }
+}
 
 @Composable
-private fun PermissionGuideDialog(
-    guide: PermGuide,
-    onDismiss: () -> Unit,
-    onPrimary: () -> Unit,
-    onSecondary: (() -> Unit)?,
-    tertiaryLabel: String? = null,
-    onTertiary: (() -> Unit)? = null
-) {
+private fun Gem(filled: Boolean, active: Boolean, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val fill by animateColorAsState(
+        targetValue = when {
+            filled -> scheme.primary
+            active -> scheme.primaryContainer
+            else -> scheme.surfaceVariant
+        },
+        animationSpec = tween(350),
+        label = "gemFill"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (filled || active) 1f else 0.9f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "gemScale"
+    )
+    Box(
+        modifier = modifier
+            .height(if (active) 14.dp else 12.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(fill)
+            .border(2.dp, DarmixTheme.colors.ink, CircleShape)
+    )
+}
+
+@Composable
+private fun StepCard(content: StepContent, onPrimary: () -> Unit, onSecondary: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .sticker(fill = scheme.surface)
+            .padding(20.dp)
     ) {
-        val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) {
-            enter.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow))
-        }
-
         Column(
             modifier = Modifier
-                .padding(start = 20.dp, end = 24.dp, top = 24.dp, bottom = 28.dp)
-                .widthIn(max = 440.dp)
+                .weight(1f)
                 .fillMaxWidth()
-                .heightIn(max = 700.dp)
-                .graphicsLayer {
-                    val s = 0.85f + 0.15f * enter.value
-                    scaleX = s
-                    scaleY = s
-                    alpha = enter.value.coerceIn(0f, 1f)
-                }
-                .sticker(shape = RoundedCornerShape(30.dp), fill = scheme.surface, depth = 4.dp)
-                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(scheme.primaryContainer)
-                        .border(2.dp, colors.ink, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(guide.icon, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(28.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Antes de abrir ajustes",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant
-                    )
-                    Text(guide.title, style = MaterialTheme.typography.titleLarge, color = scheme.onSurface)
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(guide.intro, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface)
+            if (content.badge != null) {
+                StatusBadge(content.badge, DarmixIcons.Lock, colors.blocked, scheme.onPrimary)
                 Spacer(Modifier.height(14.dp))
-                guide.steps.forEachIndexed { i, step ->
+            }
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(CircleShape)
+                    .background(scheme.primaryContainer)
+                    .border(2.5.dp, colors.ink, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(content.icon, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(42.dp))
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "En Ajustes: ${content.systemName}",
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.primary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                content.title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = scheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                highlighted(content.why),
+                style = MaterialTheme.typography.bodyLarge,
+                color = scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(22.dp))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                content.steps.forEachIndexed { i, step ->
                     StepRow(number = i + 1, text = step)
-                    Spacer(Modifier.height(10.dp))
-                }
-                guide.notes.forEach { note ->
-                    NoteBox(note)
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
             }
-
-            Spacer(Modifier.height(12.dp))
-
-            if (tertiaryLabel != null && onTertiary != null) {
-                SquishButton(
-                    text = tertiaryLabel,
-                    onClick = onTertiary,
-                    modifier = Modifier.fillMaxWidth(),
-                    container = scheme.surface,
-                    content = scheme.onSurface,
-                    fillWidth = true
+            if (content.note != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    highlighted(content.note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(8.dp))
             }
+        }
 
+        Spacer(Modifier.height(16.dp))
+
+        if (onSecondary != null && content.secondaryLabel != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SquishButton(
-                    text = if (onSecondary != null) guide.secondaryLabel ?: "Ya lo hice" else "Ahora no",
-                    onClick = { if (onSecondary != null) onSecondary() else onDismiss() },
+                    text = content.secondaryLabel,
+                    onClick = onSecondary,
                     modifier = Modifier.weight(1f),
                     container = scheme.surface,
                     content = scheme.onSurface,
                     fillWidth = true
                 )
                 SquishButton(
-                    text = guide.primaryLabel,
+                    text = content.actionLabel,
                     onClick = onPrimary,
                     modifier = Modifier.weight(1.4f),
                     fillWidth = true
                 )
             }
+        } else {
+            SquishButton(
+                text = content.actionLabel,
+                onClick = onPrimary,
+                modifier = Modifier.fillMaxWidth(),
+                fillWidth = true,
+                contentDescription = "${content.actionLabel}: ${content.title}"
+            )
         }
     }
 }
@@ -744,7 +798,7 @@ private fun StepRow(number: Int, text: String) {
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            text,
+            highlighted(text),
             style = MaterialTheme.typography.bodyMedium,
             color = scheme.onSurface,
             modifier = Modifier
@@ -754,227 +808,22 @@ private fun StepRow(number: Int, text: String) {
     }
 }
 
-@Composable
-private fun NoteBox(note: GuideNote) {
-    val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
-    val warning = note.kind == NoteKind.WARNING
-    val fill = if (warning) scheme.surfaceVariant else scheme.primaryContainer
-    val onFill = if (warning) scheme.onSurface else scheme.onPrimaryContainer
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .sticker(
-                shape = RoundedCornerShape(18.dp),
-                fill = fill,
-                depth = 0.dp,
-                borderWidth = 1.5.dp
-            )
-            .padding(12.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Icon(
-            if (warning) DarmixIcons.Lock else DarmixIcons.Sparkle,
-            contentDescription = null,
-            tint = if (warning) colors.blocked else onFill,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(note.text, style = MaterialTheme.typography.bodySmall, color = onFill)
-    }
-}
-
-
+private val HIGHLIGHT_PATTERN = Regex("«([^»]+)»")
 
 @Composable
-private fun ProgressCard(done: Int, total: Int, petName: String) {
-    val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
-    val message = when {
-        done == 0 -> "¡Empecemos!"
-        done == total -> "¡Todo listo!"
-        done == total - 1 -> "¡Solo falta uno!"
-        else -> "¡Vas muy bien!"
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .sticker(fill = MaterialTheme.colorScheme.surface)
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "$petName dice",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(message, style = MaterialTheme.typography.titleMedium)
-            }
-            Row(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(scheme.primaryContainer)
-                    .border(2.dp, colors.ink, CircleShape)
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(DarmixIcons.Sparkle, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("$done/$total", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimaryContainer)
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(total) { i -> Gem(filled = i < done, modifier = Modifier.weight(1f)) }
-        }
-    }
-}
-
-@Composable
-private fun Gem(filled: Boolean, modifier: Modifier = Modifier) {
-    val colors = DarmixTheme.colors
-    val fill by animateColorAsState(
-        targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(350),
-        label = "gemFill"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (filled) 1f else 0.92f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "gemScale"
-    )
-    Box(
-        modifier = modifier
-            .height(14.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(CircleShape)
-            .background(fill)
-            .border(2.dp, colors.ink, CircleShape)
-    )
-}
-
-@Composable
-private fun PermissionCard(item: PermItem, index: Int, highlight: Boolean, onActivate: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val colors = DarmixTheme.colors
-
-    val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        delay(index * 70L)
-        appear.animateTo(1f, spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessLow))
-    }
-
-    val depth by animateDpAsState(
-        targetValue = if (item.granted) 0.dp else 3.dp,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
-        label = "cardDepth"
-    )
-    val isRestricted = item.key == PermKey.RESTRICTED
-    val pendingFill = if (isRestricted) scheme.primaryContainer else scheme.surface
-    val fill by animateColorAsState(
-        targetValue = if (item.granted) scheme.primaryContainer else pendingFill,
-        animationSpec = tween(300),
-        label = "cardFill"
-    )
-
-    val bubbleTarget = when {
-        item.granted || isRestricted -> scheme.primary
-        else -> scheme.primaryContainer
-    }
-    val glyphTarget = when {
-        item.granted || isRestricted -> scheme.onPrimary
-        else -> scheme.onPrimaryContainer
-    }
-    val bubble by animateColorAsState(bubbleTarget, tween(300), label = "bubble")
-    val glyph by animateColorAsState(glyphTarget, tween(300), label = "glyph")
-    val onFill = if (item.granted || isRestricted) scheme.onPrimaryContainer else scheme.onSurface
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                alpha = appear.value.coerceIn(0f, 1f)
-                translationY = (1f - appear.value) * 48.dp.toPx()
-            }
-            .animateContentSize()
-            .sticker(fill = fill, depth = depth)
-            .padding(14.dp)
-    ) {
-        if (item.badge != null && !item.granted) {
-            StatusBadge(item.badge, DarmixIcons.Sparkle, scheme.primary, scheme.onPrimary)
-            Spacer(Modifier.height(10.dp))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(bubble)
-                    .border(2.dp, colors.ink, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(item.icon, contentDescription = null, tint = glyph, modifier = Modifier.size(26.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.title, style = MaterialTheme.typography.titleSmall, color = onFill)
-                Text(
-                    item.why,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (item.granted) scheme.onPrimaryContainer else scheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            AnimatedContent(
-                targetState = item.granted,
-                transitionSpec = {
-                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) + fadeIn()) togetherWith
-                            (scaleOut() + fadeOut())
-                },
-                label = "trailing"
-            ) { granted ->
-                if (granted) {
-                    CheckStamp(onClick = if (item.reopenable) onActivate else null)
-                } else {
-                    SquishButton(
-                        text = item.actionLabel,
-                        onClick = onActivate,
-                        contentDescription = "${item.actionLabel}: ${item.title}"
-                    )
+private fun highlighted(text: String): AnnotatedString {
+    val color = MaterialTheme.colorScheme.primary
+    return remember(text, color) {
+        buildAnnotatedString {
+            var cursor = 0
+            HIGHLIGHT_PATTERN.findAll(text).forEach { match ->
+                append(text.substring(cursor, match.range.first))
+                withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold, color = color)) {
+                    append(match.groupValues[1])
                 }
+                cursor = match.range.last + 1
             }
+            append(text.substring(cursor))
         }
-        if (highlight && !item.granted) {
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(DarmixIcons.Sparkle, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "Te mostramos los pasos antes de abrir los ajustes.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CheckStamp(onClick: (() -> Unit)? = null) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .background(MaterialTheme.colorScheme.primary)
-            .border(2.dp, DarmixTheme.colors.ink, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            DarmixIcons.Check, null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(22.dp)
-        )
     }
 }
