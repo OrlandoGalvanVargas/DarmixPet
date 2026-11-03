@@ -12,8 +12,8 @@ te avisa de lo importante y te recuerda que la vida también pasa fuera de la pa
 
 <br />
 
-[![Última versión](https://img.shields.io/github/v/release/OrlandoGalvanVargas/DarmixPet?style=for-the-badge&label=Versi%C3%B3n&color=1E63D6)](../../releases/latest)
-[![Descargas](https://img.shields.io/github/downloads/OrlandoGalvanVargas/DarmixPet/total?style=for-the-badge&label=Descargas&color=457D22)](../../releases)
+[![Última versión](https://img.shields.io/github/v/release/OrlandoGalvanVargas/darmixpet?style=for-the-badge&label=Versi%C3%B3n&color=1E63D6)](../../releases/latest)
+[![Descargas](https://img.shields.io/github/downloads/OrlandoGalvanVargas/darmixpet/total?style=for-the-badge&label=Descargas&color=457D22)](../../releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-instalación)
 [![Licencia](https://img.shields.io/badge/Licencia-Privada-9C6B47?style=for-the-badge)](#-licencia)
 
