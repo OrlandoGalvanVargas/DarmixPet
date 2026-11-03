@@ -1,6 +1,8 @@
 package com.darmix.darmixpet.overlay
 
+import android.app.KeyguardManager
 import android.content.Context
+import android.os.SystemClock
 import com.darmix.darmixpet.data.AppDatabase
 import com.darmix.darmixpet.data.MonitoredAppDao
 import com.darmix.darmixpet.data.MonitoredAppEntity
@@ -23,6 +25,7 @@ class AppUsageMonitor(
 
     companion object {
         private const val FOREGROUND_POLL_INTERVAL_MS = 1000L
+        private const val MAX_COUNTED_STEP_MS = 2000L
         private const val DAILY_RESET_CHECK_INTERVAL_MS = 60_000L
         private const val NO_MONITORED_APP_TEXT = "No hay ninguna app monitoreada abierta"
         private const val COOLDOWN_MESSAGE = "Todavía estás en tiempo de descanso ⏳"
@@ -31,6 +34,8 @@ class AppUsageMonitor(
     }
 
     private val dao: MonitoredAppDao = AppDatabase.getInstance(context).monitoredAppDao()
+    private val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+    private var lastCountedAt = 0L
 
     @Volatile
     var lastForegroundPackage: String? = null
@@ -89,20 +94,35 @@ class AppUsageMonitor(
     private fun startMonitoringLoop() {
         scope.launch {
             while (true) {
-                if (isScreenOn()) {
+                var counted = false
+                if (canCount()) {
                     val foregroundPackage = tracker.poll()
                     if (foregroundPackage != null) {
                         lastForegroundPackage = foregroundPackage
                         val monitoredApp = dao.getByPackageName(foregroundPackage)
-                        if (monitoredApp != null) handleMonitoredApp(monitoredApp)
+                        if (monitoredApp != null) {
+                            handleMonitoredApp(monitoredApp, nextStep())
+                            counted = true
+                        }
                     }
                 }
+                if (!counted) lastCountedAt = 0L
                 delay(FOREGROUND_POLL_INTERVAL_MS)
             }
         }
     }
 
-    private suspend fun handleMonitoredApp(app: MonitoredAppEntity) {
+    private fun canCount(): Boolean = isScreenOn() && !keyguardManager.isKeyguardLocked
+
+    private fun nextStep(): Long {
+        val now = SystemClock.elapsedRealtime()
+        val step = if (lastCountedAt == 0L) FOREGROUND_POLL_INTERVAL_MS
+        else (now - lastCountedAt).coerceIn(0L, MAX_COUNTED_STEP_MS)
+        lastCountedAt = now
+        return step
+    }
+
+    private suspend fun handleMonitoredApp(app: MonitoredAppEntity, stepMs: Long) {
         val now = System.currentTimeMillis()
         val current = applyDailyResetIfNeeded(app, now)
 
@@ -118,7 +138,7 @@ class AppUsageMonitor(
         }
 
         val sessionLimitMillis = current.sessionLimitMinutes * 60_000L
-        var updated = current.copy(usedInSessionMillis = current.usedInSessionMillis + FOREGROUND_POLL_INTERVAL_MS)
+        var updated = current.copy(usedInSessionMillis = current.usedInSessionMillis + stepMs)
 
         if (!updated.halfwayAlertGiven && updated.usedInSessionMillis >= sessionLimitMillis / 2) {
             speak("Vas a la mitad de tu tiempo en ${updated.appName}")
