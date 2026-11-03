@@ -47,7 +47,6 @@ class PetOverlayService : LifecycleService() {
         private const val BUBBLE_VISIBLE_MS = 1500L
         private const val TAIL_CLEARANCE_DP = 12
         private const val ROTATION_SETTLE_MS = 300L
-        private const val STATUS_REFRESH_INTERVAL_MS = 1000L
         private const val TRIPLE_TAP_WINDOW_MS = 600L
         private const val TAP_SUPPRESSION_WINDOW_MS = 500L
         private const val BATTERY_ALERT_REAPPEAR_INTERVAL_MS = 5 * 60_000L
@@ -101,9 +100,7 @@ class PetOverlayService : LifecycleService() {
     private lateinit var speechBubbleParams: WindowManager.LayoutParams
     private var bubbleJob: Job? = null
 
-    private var quickMenuView: QuickMenuView? = null
-    private lateinit var quickMenuParams: WindowManager.LayoutParams
-    private var quickMenuStatusJob: Job? = null
+    private lateinit var quickMenu: QuickMenuController
     private var notificationPanelView: NotificationPanelView? = null
     private lateinit var notificationPanelParams: WindowManager.LayoutParams
     private var notificationPanelJob: Job? = null
@@ -175,7 +172,7 @@ class PetOverlayService : LifecycleService() {
             speak = { ttsManager.speak(it) },
             onBlock = { blockAndRedirectHome(it) },
             onAppSwitched = {
-                if (quickMenuView != null) hideQuickMenu()
+                if (quickMenu.isOpen) quickMenu.hide()
                 if (notificationPanelView != null) hideNotificationPanel()
             }
         )
@@ -185,6 +182,25 @@ class PetOverlayService : LifecycleService() {
             isAppInFront = { isScreenOn && usageMonitor.lastForegroundPackage == it },
             speak = { ttsManager.speak(it, interrupt = false) },
             showBubble = { if (isScreenOn && !isPanelOpen()) showSpeechBubble(it) }
+        )
+        quickMenu = QuickMenuController(
+            context = this,
+            windowManager = windowManager,
+            scope = lifecycleScope,
+            deviceControls = deviceControls,
+            statusText = { usageMonitor.statusText() },
+            placeNearPet = { element, w, h -> placeNearPet(element, w, h) },
+            currentTheme = { currentSkinInfo.theme },
+            currentSkin = { skin },
+            onOpened = {
+                updateAura()
+                overlayView?.playSpriteSheet(skin.getAnimation(this, MascotaAnimState.THINKING), loop = true)
+            },
+            onClosed = {
+                overlayView?.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
+                updateAura()
+            },
+            onSleep = { PetController.sleep(this) }
         )
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -230,7 +246,7 @@ class PetOverlayService : LifecycleService() {
         SkinPreferences.unregisterListener(this, skinPrefsListener)
         if (::flashlight.isInitialized) flashlight.release()
         bubbleJob?.cancel()
-        quickMenuStatusJob?.cancel()
+        if (::quickMenu.isInitialized) quickMenu.destroy()
         batteryAlertReappearJob?.cancel()
         notificationGuard.stop()
         if (::messageAlerts.isInitialized) messageAlerts.stop()
@@ -244,8 +260,6 @@ class PetOverlayService : LifecycleService() {
         blockOverlayView = null
         speechBubbleView?.let { windowManager.removeView(it) }
         speechBubbleView = null
-        quickMenuView?.let { windowManager.removeView(it) }
-        quickMenuView = null
         notificationPanelJob?.cancel()
         notificationPanelView?.let { windowManager.removeView(it) }
         notificationPanelView = null
@@ -257,7 +271,7 @@ class PetOverlayService : LifecycleService() {
         val spec = currentSkinInfo.theme
         speechBubbleView?.setTheme(spec)
         batteryAlertView?.setTheme(spec)
-        quickMenuView?.setTheme(spec)
+        if (::quickMenu.isInitialized) quickMenu.applyTheme(spec)
         notificationPanelView?.let {
             it.setTheme(spec)
             repositionNotificationPanel(it)
@@ -385,7 +399,7 @@ class PetOverlayService : LifecycleService() {
         syncAuraPosition()
         repositionBubbleIfVisible(refreshArea = false)
         repositionBatteryAlertIfVisible(refreshArea = false)
-        quickMenuView?.let { repositionQuickMenu(it) }
+        quickMenu.reposition()
         notificationPanelView?.let { repositionNotificationPanel(it) }
     }
 
@@ -489,97 +503,8 @@ class PetOverlayService : LifecycleService() {
         batteryAlertView = null
     }
 
-    private fun ensureQuickMenu(): QuickMenuView {
-        quickMenuView?.let { return it }
-        val menu = QuickMenuView(this).apply {
-            onOutsideClick = { hideQuickMenu() }
-            onPageChanged = { repositionQuickMenu(this) }
-        }
-        quickMenuParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            0,
-            PixelFormat.TRANSLUCENT
-        )
-        windowManager.addView(menu, quickMenuParams)
-        menu.requestFocus()
-        quickMenuView = menu
-        return menu
-    }
-
-    private fun repositionQuickMenu(menu: QuickMenuView) {
-        val (w, h) = menu.measureCard()
-        val placement = placeNearPet(menu, w, h)
-        menu.positionCard(placement.x, placement.y)
-    }
-
-    private fun showQuickMenu() {
-        val menu = ensureQuickMenu()
-        updateAura()
-        menu.resetToFirstPage()
-        menu.setTheme(currentSkinInfo.theme)
-
-        overlayView?.playSpriteSheet(skin.getAnimation(this, MascotaAnimState.THINKING), loop = true)
-
-        menu.configureStatusPage("Cargando…") {
-            hideQuickMenu()
-            deviceControls.openTimerApp()
-        }
-        menu.configureBrightnessPage(deviceControls.brightnessPercent()) { percent ->
-            deviceControls.setBrightnessPercent(percent)
-        }
-        menu.configureVolumePage(deviceControls.volumePercent()) { percent ->
-            deviceControls.setVolumePercent(percent)
-        }
-        menu.configureSleepPage { PetController.sleep(this@PetOverlayService) }
-        menu.configureConfigButton {
-            hideQuickMenu()
-            deviceControls.openDarmixPet()
-        }
-        refreshSkinMenuPage(menu)
-        repositionQuickMenu(menu)
-
-        quickMenuStatusJob?.cancel()
-        quickMenuStatusJob = lifecycleScope.launch {
-            while (true) {
-                menu.setStatusText(usageMonitor.statusText())
-                repositionQuickMenu(menu)
-                delay(STATUS_REFRESH_INTERVAL_MS)
-            }
-        }
-    }
-
-    private fun hideQuickMenu() {
-        quickMenuStatusJob?.cancel()
-        quickMenuStatusJob = null
-        quickMenuView?.let { windowManager.removeView(it) }
-        quickMenuView = null
-        overlayView?.playSpriteSheet(skin.getAnimation(this, currentBaseState), loop = true)
-        updateAura()
-    }
-
-    private fun refreshSkinMenuPage(menu: QuickMenuView) {
-        val previewFrame = skin.getAnimation(this, MascotaAnimState.IDLE).frames.firstOrNull()
-        menu.configureSkinPage(
-            name = skin.displayName,
-            previewFrame = previewFrame,
-            onPrev = { cycleSkin(-1, menu) },
-            onNext = { cycleSkin(1, menu) }
-        )
-    }
-
-    private fun cycleSkin(direction: Int, menu: QuickMenuView) {
-        val skins = SkinRegistry.availableSkins
-        if (skins.isEmpty()) return
-        val currentIndex = skins.indexOfFirst { it.id == skin.id }.coerceAtLeast(0)
-        val nextIndex = (currentIndex + direction + skins.size) % skins.size
-        SkinPreferences.setSelectedSkinId(this, skins[nextIndex].id)
-        refreshSkinMenuPage(menu)
-        repositionQuickMenu(menu)
-    }
-
-    private fun isPanelOpen(): Boolean = quickMenuView != null || notificationPanelView != null
+    private fun isPanelOpen(): Boolean =
+        (::quickMenu.isInitialized && quickMenu.isOpen) || notificationPanelView != null
 
     private fun ensureNotificationPanel(): NotificationPanelView {
         notificationPanelView?.let { return it }
@@ -833,7 +758,7 @@ class PetOverlayService : LifecycleService() {
             }
 
             override fun onLongPress(e: MotionEvent) {
-                showQuickMenu()
+                quickMenu.show()
             }
         })
 
