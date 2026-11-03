@@ -33,7 +33,7 @@ te avisa de lo importante y te recuerda que la vida también pasa fuera de la pa
 <br />
 <br />
 
-[Novedades](#-novedades-en-v130) ·
+[Novedades](#-novedades-en-v140) ·
 [Características](#-características) ·
 [Compañeros](#-tus-compañeros) ·
 [Gestos](#-gestos) ·
@@ -60,19 +60,19 @@ Cuando el tiempo de una app vigilada se agota, tu compañero te lleva suavemente
 
 ---
 
-## 🆕 Novedades en v1.3.0
+## 🆕 Novedades en v1.4.0
 
 > [!TIP]
-> **Notificaciones y un nuevo look.** Tu compañero ahora te ayuda con tus notificaciones, y la app se viste con los colores de tu personaje.
+> **Permisos más fáciles y personajes con más vida.** La configuración inicial te lleva de la mano, la vigilancia es más precisa y cada compañero se presenta con su propia carta.
 
 | | Novedad |
 | :-: | --- |
-| 🔔 | **Panel de notificaciones**: toca a tu mascota para leerlas, abrirlas o eliminarlas sin bajar la barra |
-| 🔴 | **Aura de aviso**: un brillo rojo alrededor de tu mascota cuando tienes notificaciones pendientes |
-| 💬 | **Avisos de mensajes por voz**: te dice cuando llega un mensaje de WhatsApp u otras apps que elijas |
-| 🔇 | **Voz configurable**: silencia a tu mascota cuando quieras, sin perder sus avisos visuales |
-| 🎨 | **Colores por personaje**: toda la app cambia de paleta según tu compañero, en claro y oscuro |
-| ✨ | **Nuevo inicio animado** protagonizado por tu personaje, y un nuevo emblema |
+| 👋 | **Bienvenida con tu personaje**: te explica los permisos y te recuerda si te faltó alguno |
+| 🔐 | **Permisos paso a paso**: uno a la vez, en orden, con pasos adaptados a la marca de tu teléfono |
+| 💌 | **Una carta de cada compañero**: su historia, sus manías y para quién es ideal |
+| ⚡ | **Rayos de energía** sobre tu personaje y un efecto especial al elegirlo |
+| 💬 | **Frases nuevas**, más naturales y con la voz de cada personaje |
+| 🛠️ | **Correcciones**: temporizador, volumen en Oppo y vigilancia con ventanas flotantes |
 
 Consulta todos los detalles en el [**CHANGELOG**](CHANGELOG.md).
 
@@ -143,7 +143,7 @@ DarmixPet te avisa cuando hay una versión nueva, te muestra las novedades y la 
 
 ## 🎭 Tus compañeros
 
-Tres almas para tres formas de cuidarte. Elige la tuya desde la pantalla **Mascota**: la app, el inicio animado, los avisos y el menú rápido cambian de estilo contigo.
+Tres compañeros para tres formas de cuidarte. Conócelos en la pantalla **Mascota**, donde cada uno te escribe una carta, y elige el tuyo: la app, el inicio animado, los avisos y el menú rápido cambian de estilo contigo.
 
 <table>
 <tr>
@@ -151,22 +151,22 @@ Tres almas para tres formas de cuidarte. Elige la tuya desde la pantalla **Masco
 <img src="docs/characters/archi.png" width="140" alt="Archi el Archimago" /><br />
 <h3>Archi el Archimago</h3>
 <sub>Éter · Magia Arcana</sub><br /><br />
-<em>"Respira. Yo me encargo del ruido."</em><br /><br />
-<sub>Analítico, sereno y enfocado</sub>
+<em>"Tú enfócate, yo vigilo."</em><br /><br />
+<sub>Para ti, si te distraes fácil</sub>
 </td>
 <td align="center" width="33%">
 <img src="docs/characters/sylva.png" width="140" alt="Sylva el Sabio" /><br />
 <h3>Sylva el Sabio</h3>
 <sub>Naturaleza · Vitalidad</sub><br /><br />
-<em>"Todo lo bueno crece con calma."</em><br /><br />
-<sub>Paciente, alegre y reconfortante</sub>
+<em>"Despacio también se llega."</em><br /><br />
+<sub>Para ti, si se te olvida descansar</sub>
 </td>
 <td align="center" width="33%">
 <img src="docs/characters/galahad.png" width="76" alt="Sir Galahad el Guardián" /><br />
 <h3>Sir Galahad el Guardián</h3>
 <sub>Tierra · Disciplina</sub><br /><br />
-<em>"Tu tiempo es tu tesoro. Yo lo defiendo."</em><br /><br />
-<sub>Valiente, firme y leal</sub>
+<em>"Tu tiempo no se negocia."</em><br /><br />
+<sub>Para ti, si necesitas límites firmes</sub>
 </td>
 </tr>
 </table>
@@ -233,14 +233,14 @@ flowchart LR
 | **Android** | 8.0 Oreo (API 26) o superior |
 | **Arquitectura** | Universal |
 | **Espacio** | ~17 MB |
-| **Permisos** | 7, más un paso previo en Android 13+ ([detalle](#-permisos-paso-a-paso)) |
+| **Permisos** | 7, más un desbloqueo en Android 13+ si Android lo pide ([detalle](#-permisos-paso-a-paso)) |
 
 ### Pasos
 
 1. Descarga el **APK** desde la [página oficial](https://darmixista.dev/darmixpet/) o desde la [última release](../../releases/latest).
 2. Ábrelo desde tu gestor de archivos.
 3. Si Android lo pide, **autoriza la instalación desde esta fuente**.
-4. Abre DarmixPet y **completa la pantalla de permisos**: la app te muestra los pasos antes de abrir cada ajuste.
+4. Abre DarmixPet y **sigue la pantalla de permisos**: te guía uno por uno y te dice qué tocar en cada ajuste.
 5. Elige a tu compañero y empieza a cuidar tu tiempo.
 
 > [!TIP]
@@ -253,7 +253,7 @@ flowchart LR
 
 ## 🔐 Permisos paso a paso
 
-DarmixPet te guía en cada permiso dentro de la app. Aquí tienes el detalle para que sepas qué esperar y **para qué se usa cada uno**.
+DarmixPet te pide los permisos **uno a la vez y en orden**, y en cada paso te dice qué tocar según la marca de tu teléfono. Aquí tienes el detalle para que sepas qué esperar y **para qué se usa cada uno**.
 
 <div align="center">
 <img src="docs/screenshots/permissions.png" alt="Pantalla de permisos" width="280" />
@@ -261,128 +261,122 @@ DarmixPet te guía en cada permiso dentro de la app. Aquí tienes el detalle par
 
 | # | Permiso | Para qué sirve |
 | :-: | --- | --- |
-| 0 | **Permitir ajustes restringidos** | Paso previo que desbloquea los demás (solo Android 13+ fuera de Google Play) |
-| 1 | **Mostrar sobre otras apps** | Que tu mascota flote sobre el resto de apps |
-| 2 | **Acceso a datos de uso** | Medir cuánto tiempo pasas en cada app |
-| 3 | **Notificaciones** | Avisarte de los descansos y mantener viva a tu mascota |
-| 4 | **Leer notificaciones** | Mostrarte tus notificaciones con un toque y avisarte de mensajes |
-| 5 | **Ignorar optimización de batería** | Que tu mascota no se cierre sola |
-| 6 | **Detección instantánea** (Accesibilidad) | Saber al instante qué app abres |
+| 1 | **Detección instantánea** (Accesibilidad) | Saber al instante qué app abres |
+| 2 | **Leer notificaciones** | Mostrarte tus notificaciones con un toque y avisarte de mensajes |
+| 3 | **Acceso a datos de uso** | Medir cuánto tiempo pasas en cada app |
+| 4 | **Mostrar sobre otras apps** | Que tu mascota flote sobre el resto de apps |
+| 5 | **Notificaciones** | Avisarte de los descansos y mantener viva a tu mascota |
+| 6 | **Ignorar optimización de batería** | Que tu mascota no se cierre sola |
 | 7 | **Modificar ajustes del sistema** | Ajustar el brillo desde el menú rápido |
 
+Los tres primeros son los que Android restringe en apps que no vienen de una tienda, por eso van primero.
+
 <details>
-<summary><b>0️⃣ Permitir ajustes restringidos</b></summary>
+<summary><b>🔓 Si Android dice "Ajuste restringido"</b></summary>
 
 <br />
 
 > [!WARNING]
-> Solo aparece si instalaste desde fuera de Google Play y tienes **Android 13 o superior**.
+> Solo pasa en **Android 13 o superior** si instalaste DarmixPet desde un APK. Se desbloquea **una sola vez**.
+
+Al intentar activar **Detección instantánea**, Android puede mostrar el aviso *"Ajuste restringido"*. Acéptalo y vuelve a DarmixPet: el mismo paso te mostrará cómo desbloquearlo.
 
 | Paso | Acción |
 | :-: | --- |
-| 1 | Se abrirá **Información de la app** de DarmixPet |
-| 2 | Toca el menú **⋮** (arriba a la derecha) y elige **Permitir ajustes restringidos** |
-| 3 | Confirma con huella, PIN o patrón si te lo pide |
-| 4 | Vuelve a DarmixPet y toca **"Ya lo hice"** |
-
-💡 **¿No ves la opción?** Android a veces solo la muestra después de intentar activar un permiso bloqueado. Prueba primero con **Acceso a datos de uso**: saldrá un aviso, tócalo, acepta y regresa a la información de la app.
+| 1 | Toca **Abrir info de la app** (en Oppo, Realme y OnePlus se abre la lista de apps: busca **DarmixPet** y tócalo) |
+| 2 | Toca los tres puntos **⋮** de arriba a la derecha y elige **Permitir ajustes restringidos**. En Xiaomi con HyperOS es un interruptor al final de la pantalla |
+| 3 | Confirma con tu huella o PIN |
+| 4 | Vuelve a DarmixPet, toca **Ya lo hice** y activa Detección instantánea |
 
 </details>
 
 <details>
-<summary><b>1️⃣ Mostrar sobre otras apps</b></summary>
+<summary><b>1️⃣ Detección instantánea (Accesibilidad)</b></summary>
 
 <br />
 
 | Paso | Acción |
 | :-: | --- |
-| 1 | Se abrirá la pantalla de DarmixPet |
-| 2 | Activa **"Permitir mostrar sobre otras apps"** |
-| 3 | Vuelve con el botón **Atrás** |
+| 1 | Si se abre la lista de Accesibilidad, entra a **Apps descargadas** (en Samsung, **Apps instaladas**; en Huawei, **Servicios instalados**) y toca **DarmixPet** |
+| 2 | Activa el interruptor y toca **Permitir** en el aviso. A veces el botón tarda unos segundos en activarse |
+| 3 | Vuelve a DarmixPet |
 
-<div align="center"><img src="docs/screenshots/perm_overlay.png" width="220" alt="Permiso para mostrar sobre otras apps" /></div>
+🔒 DarmixPet **solo lo usa para saber qué app está abierta**. No lee lo que escribes, tus mensajes ni tus contraseñas.
+
+<div align="center"><img src="docs/screenshots/perm_accessibility.png" width="220" alt="Permiso de accesibilidad" /></div>
 
 </details>
 
 <details>
-<summary><b>2️⃣ Acceso a datos de uso</b></summary>
+<summary><b>2️⃣ Leer notificaciones</b></summary>
 
 <br />
 
 | Paso | Acción |
 | :-: | --- |
-| 1 | Se abrirá la pantalla de DarmixPet. Si ves una lista, busca **DarmixPet** y tócalo |
-| 2 | Activa **"Permitir acceso al uso"** |
-| 3 | Si aparece un aviso de seguridad, léelo y acepta |
-| 4 | Vuelve a DarmixPet |
+| 1 | Activa el interruptor de **DarmixPet** |
+| 2 | Toca **Permitir** en el aviso |
+| 3 | Vuelve a DarmixPet |
+
+🔒 DarmixPet solo lee tus notificaciones para mostrártelas en tu mascota y avisarte de mensajes. **No las guarda ni las envía a ningún lado.**
+
+</details>
+
+<details>
+<summary><b>3️⃣ Acceso a datos de uso</b></summary>
+
+<br />
+
+| Paso | Acción |
+| :-: | --- |
+| 1 | Si ves una lista de apps, busca **DarmixPet** y tócalo |
+| 2 | Activa el interruptor |
+| 3 | Vuelve a DarmixPet |
 
 <div align="center"><img src="docs/screenshots/perm_usage.png" width="220" alt="Permiso de acceso a datos de uso" /></div>
 
 </details>
 
 <details>
-<summary><b>3️⃣ Notificaciones</b></summary>
+<summary><b>4️⃣ Mostrar sobre otras apps</b></summary>
 
 <br />
 
-- **Primera vez**: Android muestra un diálogo. Toca **Permitir**.
-- **Si lo rechazaste antes**: se abrirán los ajustes de notificaciones de DarmixPet. Activa **Permitir notificaciones** y vuelve.
+| Paso | Acción |
+| :-: | --- |
+| 1 | Busca **DarmixPet** en la lista de apps y tócalo (desde Android 11 siempre aparece la lista primero) |
+| 2 | Activa el interruptor |
+| 3 | Vuelve a DarmixPet |
+
+<div align="center"><img src="docs/screenshots/perm_overlay.png" width="220" alt="Permiso para mostrar sobre otras apps" /></div>
+
+</details>
+
+<details>
+<summary><b>5️⃣ Notificaciones</b></summary>
+
+<br />
+
+- **Primera vez**: Android muestra una ventana. Toca **Permitir**.
+- **Si lo rechazaste antes**: se abren los ajustes de notificaciones de DarmixPet. Activa el interruptor y vuelve.
 
 <div align="center"><img src="docs/screenshots/perm_notifications.png" width="220" alt="Permiso de notificaciones" /></div>
 
 </details>
 
 <details>
-<summary><b>4️⃣ Leer notificaciones</b></summary>
+<summary><b>6️⃣ Ignorar optimización de batería</b></summary>
 
 <br />
 
 | Paso | Acción |
 | :-: | --- |
-| 1 | Se abrirá **Acceso a notificaciones**. Si ves una lista, busca **DarmixPet** y tócalo |
-| 2 | Activa **"Permitir acceso a notificaciones"** |
-| 3 | Android te mostrará lo que la app podrá leer. Toca **Permitir** |
-| 4 | Vuelve a DarmixPet |
+| 1 | Toca **Permitir** en la ventana que aparece |
+| 2 | Si en su lugar se abre una lista, busca **DarmixPet** y elige la opción sin restricciones |
 
-🔒 DarmixPet solo lee tus notificaciones para mostrártelas en tu mascota y avisarte de mensajes. **No las guarda ni las envía a ningún lado.**
-
-💡 Según la marca, también puede estar en **Acceso especial**, **Privacidad** o **Notificaciones → Configuración avanzada**.
-
-</details>
-
-<details>
-<summary><b>5️⃣ Ignorar optimización de batería</b></summary>
-
-<br />
-
-| Paso | Acción |
-| :-: | --- |
-| 1 | Se abrirá la configuración de batería de DarmixPet |
-| 2 | Elige **Sin restricciones** (o **No optimizar** / **Permitir**) |
-| 3 | Vuelve a DarmixPet |
-
-💡 En Xiaomi, Huawei y otras marcas conviene activar también **Inicio automático** para DarmixPet desde los ajustes de la marca.
+💡 En Xiaomi, Oppo, Huawei, Honor y Vivo conviene activar también **Inicio automático** en la información de DarmixPet.
 
 <div align="center"><img src="docs/screenshots/perm_battery.png" width="220" alt="Permiso de batería" /></div>
-
-</details>
-
-<details>
-<summary><b>6️⃣ Detección instantánea (Accesibilidad)</b></summary>
-
-<br />
-
-| Paso | Acción |
-| :-: | --- |
-| 1 | Se abrirá Accesibilidad |
-| 2 | Entra a **Apps descargadas** (o **Servicios instalados**) y toca DarmixPet |
-| 3 | Activa **Usar DarmixPet** |
-| 4 | Acepta el aviso de seguridad (en algunos teléfonos el botón tarda unos segundos en habilitarse) |
-| 5 | Vuelve a DarmixPet |
-
-🔒 DarmixPet **solo lo usa para saber qué app está abierta**. No lee lo que escribes, tus mensajes ni tus contraseñas.
-
-<div align="center"><img src="docs/screenshots/perm_accessibility.png" width="220" alt="Permiso de accesibilidad" /></div>
 
 </details>
 
@@ -393,9 +387,8 @@ DarmixPet te guía en cada permiso dentro de la app. Aquí tienes el detalle par
 
 | Paso | Acción |
 | :-: | --- |
-| 1 | Se abrirá la pantalla de DarmixPet |
-| 2 | Activa **"Permitir modificar los ajustes del sistema"** |
-| 3 | Vuelve a DarmixPet |
+| 1 | Activa el interruptor |
+| 2 | Vuelve a DarmixPet |
 
 <div align="center"><img src="docs/screenshots/perm_writesettings.png" width="220" alt="Permiso para modificar ajustes del sistema" /></div>
 
@@ -437,7 +430,7 @@ DarmixPet te guía en cada permiso dentro de la app. Aquí tienes el detalle par
 
 <br />
 
-DarmixPet es un proyecto personal que se distribuye de forma directa y gratuita. Por eso Android pide el paso de **ajustes restringidos** en Android 13 o superior. Las actualizaciones llegan desde la propia app.
+DarmixPet es un proyecto personal que se distribuye de forma directa y gratuita. Por eso, en Android 13 o superior, Android puede pedir desbloquear los **ajustes restringidos** una vez. La app te guía en ese paso, y las actualizaciones llegan desde la propia app.
 
 </details>
 
@@ -552,6 +545,7 @@ Consulta el archivo [LICENSE](LICENSE) para ver los términos completos.
 
 | Versión | Fecha | Resumen |
 | --- | --- | --- |
+| **v1.4.0** | 2026-11-03 | Permisos paso a paso, bienvenida, cartas de los personajes, rayos de energía y correcciones de vigilancia |
 | **v1.3.0** | 2026-10-29 | Panel de notificaciones, avisos de mensajes por voz, colores por personaje y nuevo inicio animado |
 
 Consulta el [**CHANGELOG**](CHANGELOG.md) para ver el registro completo de todas las versiones.

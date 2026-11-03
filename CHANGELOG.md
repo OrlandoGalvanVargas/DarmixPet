@@ -25,6 +25,58 @@ y este proyecto se adhiere a [Versionado Semántico](https://semver.org/lang/es/
 
 ---
 
+## [1.4.0] — 2026-11-03
+
+**Permisos más fáciles y personajes con más vida.** La configuración inicial ahora te lleva de la mano, la vigilancia es más precisa y cada compañero se presenta con su propia carta.
+
+### Añadido
+
+**Primeros pasos**
+
+- Diálogo de bienvenida con tu personaje animado que explica para qué son los permisos. Si cierras la app sin terminar, te recuerda cuántos faltan, y si Android desactiva alguno después, te avisa.
+
+**Pantalla Mascota**
+
+- Carta de presentación de cada personaje: un saludo para quien lo elige, su historia en primera persona, firma a mano, matasellos con su lugar de origen, una posdata y sus manías en stickers.
+- Rayos de energía que parpadean sobre cada personaje, en su color.
+- Al elegir un compañero se reproduce su animación especial mientras lo rodean burbujas de cristal (Archi), hojas (Sylva) o piedritas (Galahad).
+- Ícono propio para el elemento de cada personaje: luna, brote y escudo.
+
+### Cambiado
+
+**Permisos**
+
+- Pantalla de permisos rediseñada: un permiso a la vez, en orden, con pasos cortos y sin ventanas emergentes.
+- Los permisos que Android restringe van primero, y el desbloqueo de **ajustes restringidos** aparece solo cuando hace falta, dentro del mismo paso.
+- Cada permiso abre directo su ajuste cuando la versión de Android lo permite, y los pasos se adaptan a la marca del teléfono (Samsung, Xiaomi, Oppo, Huawei, Honor, Vivo y otros).
+- En Xiaomi con HyperOS la guía explica el interruptor al final de la pantalla, y en Oppo, Realme y OnePlus abre la lista de apps para que aparezca el menú ⋮.
+- Las opciones que hay que tocar se resaltan en negrita y cada paso dice cómo se llama el permiso en Ajustes.
+
+**Personajes y textos**
+
+- Frases nuevas para los tres personajes: más naturales, más cortas y con la voz de cada uno, también al prender y apagar la linterna.
+- La notificación fija dice el nombre de tu personaje actual, también al cambiarlo.
+- La guía "Cómo jugar" usa íconos de gesto y un estallido de puntitos en lugar de estrellas.
+- El aviso "se muestra sobre otras apps" en Ajustes resalta las opciones y usa el nombre de tu personaje.
+- Nuevo fondo azul hielo en el ícono de la app.
+
+### Corregido
+
+- El botón **Temporizador** del menú rápido cerraba la app si no tenías Tiempomio. Ahora abre el reloj de tu teléfono o te avisa si no encuentra uno.
+- El control de volumen del menú rápido no funcionaba en algunos teléfonos, como los Oppo con ColorOS.
+- El tiempo de una app vigilada dejaba de contar después de usar una ventana flotante encima de ella.
+- La barra de notificaciones y el teclado ya no confunden la detección de la app abierta.
+- El conteo ahora se pausa también en la pantalla de bloqueo, y el tiempo medido es más exacto en sesiones largas.
+- La opción ⋮ "Permitir ajustes restringidos" no aparecía al abrir la información de la app desde DarmixPet.
+- En la pantalla Mascota, algunas tarjetas no cambiaban de color hasta elegir al personaje.
+
+### Notas
+
+- Se instala encima de la versión anterior sin perder tus apps vigiladas ni tus ajustes.
+- Si ya tenías todos los permisos, no tienes que volver a concederlos.
+
+---
+
 ## [1.3.0] — 2026-10-29
 
 **Notificaciones y un nuevo look.** Tu compañero ahora te ayuda con tus notificaciones, y la app se viste con los colores de tu personaje.
