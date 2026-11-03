@@ -20,7 +20,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,25 +49,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -76,6 +72,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.darmix.darmixpet.mascota.ConfigurableSkin
+import com.darmix.darmixpet.mascota.MascotaAnimState
 import com.darmix.darmixpet.mascota.SkinInfo
 import com.darmix.darmixpet.mascota.SkinPreferences
 import com.darmix.darmixpet.mascota.SkinRegistry
@@ -93,25 +91,18 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.PI
 import kotlin.math.absoluteValue
-import kotlin.math.cos
-import kotlin.math.sin
 import com.darmix.darmixpet.ui.theme.AppPalettes
 
 private val SpriteFilterQuality = FilterQuality.Medium
 
 private const val FRAME_DELAY_MS = 140L
 
+private const val AURA_FLICKER_MS = 1400
+private const val POWER_UP_MS = 320
+private const val POWER_DOWN_MS = 520
 
-private val SparkleSpots = listOf(
-    Triple(0.14f, 0.20f, 0.00f),
-    Triple(0.84f, 0.16f, 0.30f),
-    Triple(0.09f, 0.62f, 0.60f),
-    Triple(0.90f, 0.58f, 0.15f),
-    Triple(0.30f, 0.08f, 0.80f),
-    Triple(0.72f, 0.80f, 0.45f)
-)
+private class SkinFrames(val idle: List<ImageBitmap>, val tripleTap: List<ImageBitmap>)
 
 @Composable
 fun SkinSelectionScreen(modifier: Modifier = Modifier) {
@@ -123,12 +114,17 @@ fun SkinSelectionScreen(modifier: Modifier = Modifier) {
     var selectedId by remember { mutableStateOf(SkinPreferences.getSelectedSkinId(context)) }
 
 
-    var sprites by remember { mutableStateOf<Map<String, List<ImageBitmap>>>(emptyMap()) }
+    var sprites by remember { mutableStateOf<Map<String, SkinFrames>>(emptyMap()) }
     LaunchedEffect(Unit) {
         sprites = withContext(Dispatchers.IO) {
             skins.associate { info ->
-                info.id to SpriteSheet.fromDrawable(context, info.idleRes, frameCount = 6)
+                val idle = SpriteSheet.fromDrawable(context, info.idleRes, frameCount = 6)
                     .frames.map { it.asImageBitmap() }
+                val tripleTap = runCatching {
+                    ConfigurableSkin(info).getAnimation(context, MascotaAnimState.TRIPLE_TAP)
+                        .frames.map { it.asImageBitmap() }
+                }.getOrDefault(emptyList())
+                info.id to SkinFrames(idle, tripleTap)
             }
         }
     }
@@ -285,14 +281,13 @@ fun SkinSelectionScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun SkinStage(
     skin: SkinInfo,
-    frames: List<ImageBitmap>?,
+    frames: SkinFrames?,
     isSelected: Boolean,
     page: Int,
     celebrate: SharedFlow<Int>
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = DarmixTheme.colors
-    val skinColors = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).extras
     val skinScheme = AppPalettes.forSkin(skin.id, DarmixTheme.isDark).scheme
     val isDark = DarmixTheme.isDark
     val accent = Color(skin.accentColor)
@@ -300,11 +295,14 @@ private fun SkinStage(
 
 
     var frameIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(frames) {
-        if (!frames.isNullOrEmpty()) {
+    var reaction by remember { mutableStateOf<List<ImageBitmap>?>(null) }
+    var reactionIndex by remember { mutableIntStateOf(0) }
+    val idleFrames = frames?.idle.orEmpty()
+    LaunchedEffect(idleFrames) {
+        if (idleFrames.isNotEmpty()) {
             while (true) {
                 delay(FRAME_DELAY_MS)
-                frameIndex = (frameIndex + 1) % frames.size
+                frameIndex = (frameIndex + 1) % idleFrames.size
             }
         }
     }
@@ -320,25 +318,31 @@ private fun SkinStage(
         ),
         label = "float"
     )
-    val twinkle by infinite.animateFloat(
+    val flame by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)),
-        label = "twinkle"
+        animationSpec = infiniteRepeatable(tween(AURA_FLICKER_MS, easing = LinearEasing)),
+        label = "flame"
     )
 
 
-    val pop = remember { Animatable(1f) }
-    val burst = remember { Animatable(0f) }
-    LaunchedEffect(page) {
+    val auraColors = remember(skin.id) { auraColorsFor(skin.id) }
+    val power = remember { Animatable(0f) }
+    LaunchedEffect(page, frames) {
         celebrate.collect { target ->
-            if (target == page) {
-                launch {
-                    pop.animateTo(1.2f, tween(120))
-                    pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
+            val tripleTap = frames?.tripleTap.orEmpty()
+            if (target == page && tripleTap.isNotEmpty() && reaction == null) {
+                reaction = tripleTap
+                val charge = launch {
+                    power.animateTo(1f, tween(POWER_UP_MS, easing = FastOutSlowInEasing))
                 }
-                burst.snapTo(0f)
-                burst.animateTo(1f, tween(800, easing = FastOutSlowInEasing))
+                for (i in tripleTap.indices) {
+                    reactionIndex = i
+                    delay(FRAME_DELAY_MS)
+                }
+                charge.cancel()
+                reaction = null
+                power.animateTo(0f, tween(POWER_DOWN_MS, easing = FastOutSlowInEasing))
             }
         }
     }
@@ -358,16 +362,6 @@ private fun SkinStage(
                     val cx = size.width / 2f
                     val cy = size.height / 2f
 
-                    val glow = 130.dp.toPx()
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(accent.copy(alpha = 0.55f), Color.Transparent),
-                            center = Offset(cx, cy),
-                            radius = glow
-                        ),
-                        radius = glow,
-                        center = Offset(cx, cy)
-                    )
 
                     val k = 1f + 0.12f * float
                     val w = 100.dp.toPx() * k
@@ -378,51 +372,37 @@ private fun SkinStage(
                         size = Size(w, h)
                     )
 
-                    SparkleSpots.forEach { (fx, fy, phase) ->
-                        val pulse = 0.5f + 0.5f * sin((twinkle + phase) * 2f * PI.toFloat())
-                        drawStar(
-                            center = Offset(size.width * fx, size.height * fy),
-                            radius = (4f + 6f * pulse).dp.toPx(),
-                            color = skinColors.accent.copy(alpha = 0.35f + 0.6f * pulse)
-                        )
-                    }
+                    drawEnergyAura(
+                        center = Offset(cx, cy + float * 7.dp.toPx() + 4.dp.toPx()),
+                        radiusX = 60.dp.toPx(),
+                        radiusY = 90.dp.toPx(),
+                        t = flame,
+                        breath = float,
+                        colors = auraColors,
+                        power = power.value
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
-            if (!frames.isNullOrEmpty()) {
+            val playing = reaction
+            val bitmap = when {
+                playing != null -> playing[reactionIndex.coerceIn(0, playing.lastIndex)]
+                idleFrames.isNotEmpty() -> idleFrames[frameIndex % idleFrames.size]
+                else -> null
+            }
+            if (bitmap != null) {
                 Image(
-                    bitmap = frames[frameIndex % frames.size],
+                    bitmap = bitmap,
                     contentDescription = skin.displayName,
                     filterQuality = SpriteFilterQuality,
                     modifier = Modifier
                         .size(170.dp)
                         .graphicsLayer {
                             translationY = float * 7.dp.toPx()
-                            scaleX = pop.value
-                            scaleY = pop.value
                         }
                 )
             } else {
                 HatBadge(size = 72.dp)
-            }
-
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val t = burst.value
-                if (t > 0f && t < 1f) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    for (i in 0 until 10) {
-                        val a = (i * 36f + 12f) * (PI / 180f).toFloat()
-                        val r = 50.dp.toPx() + t * 110.dp.toPx()
-                        val c = if (i % 2 == 0) skinColors.accent else accent
-                        drawStar(
-                            center = Offset(cx + r * cos(a), cy + r * sin(a)),
-                            radius = 12.dp.toPx() * (1f - t) + 2.dp.toPx(),
-                            color = c.copy(alpha = 1f - t)
-                        )
-                    }
-                }
             }
 
 
@@ -445,24 +425,8 @@ private fun SkinStage(
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(6.dp))
-        StatusBadge(skin.subtitle, DarmixIcons.Sparkle, accent, readableOn(accent))
+        StatusBadge(skin.subtitle, elementIconFor(skin.id), accent, readableOn(accent))
     }
-}
-
-
-private fun DrawScope.drawStar(center: Offset, radius: Float, color: Color) {
-    val path = Path().apply {
-        val inner = radius * 0.32f
-        for (i in 0 until 8) {
-            val r = if (i % 2 == 0) radius else inner
-            val a = (PI / 4.0 * i - PI / 2.0).toFloat()
-            val x = center.x + r * cos(a)
-            val y = center.y + r * sin(a)
-            if (i == 0) moveTo(x, y) else lineTo(x, y)
-        }
-        close()
-    }
-    drawPath(path, color)
 }
 
 
@@ -612,7 +576,7 @@ private fun SkinInfoPanel(skin: SkinInfo, lore: SkinLore) {
             verticalAlignment = Alignment.Top
         ) {
             Icon(
-                DarmixIcons.Sparkle, contentDescription = null,
+                elementIconFor(skin.id), contentDescription = null,
                 tint = skinScheme.onPrimaryContainer, modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(10.dp))

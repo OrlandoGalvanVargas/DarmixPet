@@ -405,6 +405,47 @@ object DarmixIcons {
         }
     }
 
+    val Sprout: ImageVector by lazy {
+        icon("Sprout") {
+            val left: PathBuilder.() -> Unit = {
+                moveTo(12f, 14f)
+                curveTo(11.6f, 10f, 8.6f, 7.6f, 4f, 8f)
+                curveTo(4.2f, 12f, 7.4f, 14.6f, 12f, 14f)
+                close()
+            }
+            val right: PathBuilder.() -> Unit = {
+                moveTo(12f, 11.2f)
+                curveTo(12.3f, 6.8f, 15.6f, 4.2f, 20f, 4.5f)
+                curveTo(19.9f, 8.9f, 16.6f, 11.6f, 12f, 11.2f)
+                close()
+            }
+            wash(left)
+            wash(right)
+            outline(block = left)
+            outline(block = right)
+            outline { moveTo(12f, 20.5f); lineTo(12f, 11f) }
+            outline { moveTo(8f, 20.5f); lineTo(16f, 20.5f) }
+        }
+    }
+
+    val Shield: ImageVector by lazy {
+        icon("Shield") {
+            val shield: PathBuilder.() -> Unit = {
+                moveTo(12f, 3f)
+                lineTo(19.5f, 5.8f)
+                lineTo(19.5f, 11.2f)
+                curveTo(19.5f, 15.8f, 16.4f, 19.3f, 12f, 21f)
+                curveTo(7.6f, 19.3f, 4.5f, 15.8f, 4.5f, 11.2f)
+                lineTo(4.5f, 5.8f)
+                close()
+            }
+            wash(shield)
+            outline(block = shield)
+            outline { moveTo(12f, 7f); lineTo(12f, 17f) }
+            outline { moveTo(8f, 11f); lineTo(16f, 11f) }
+        }
+    }
+
     val HalfCircle: ImageVector by lazy {
         icon("HalfCircle") {
             wash {
